@@ -5,7 +5,10 @@
     "iconAnimation": "lift",
     "fonts": {},
     "vars": {
-      "common": {},
+      "common": {
+        "--fs-scale": "0.89",
+        "--chip-radius": "71px"
+      },
       "dark": {},
       "light": {}
     },
