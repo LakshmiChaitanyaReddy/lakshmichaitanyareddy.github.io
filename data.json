@@ -1,6 +1,6 @@
 {
   "theme": {
-    "preset": "terminal",
+    "preset": "violet",
     "mode": "dark",
     "iconAnimation": "lift",
     "fonts": {},
