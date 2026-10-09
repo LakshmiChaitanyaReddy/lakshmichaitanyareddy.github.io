@@ -1,14 +1,11 @@
 {
   "theme": {
-    "preset": "violet",
+    "preset": "ocean",
     "mode": "dark",
     "iconAnimation": "lift",
     "fonts": {},
     "vars": {
-      "common": {
-        "--fs-scale": "0.89",
-        "--chip-radius": "71px"
-      },
+      "common": {},
       "dark": {},
       "light": {}
     },
