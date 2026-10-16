@@ -5,14 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
 <meta name="referrer" content="no-referrer">
-<title>Content admin | Portfolio</title>
+<title>Manage my portfolio | Portfolio</title>
 <meta name="description" content="Private editing UI for the portfolio content file.">
 
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔧</text></svg>">
-
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 
 <style>
 /* ══════════════════════════════════════════════════════════════════════
@@ -122,6 +118,12 @@ img { max-width: 100%; display: block; }
 .brand .dot { color: var(--accent); }
 .brand .tool { color: var(--text-dim); }
 .nav-actions { display: flex; align-items: center; gap: .5rem; }
+@media (max-width: 619px) {
+  .nav { height: auto; min-height: var(--nav-h); padding-block: .65rem; flex-wrap: wrap; gap: .6rem; }
+  .brand { width: 100%; font-size: .82rem; white-space: normal; }
+  .nav-actions { flex-wrap: wrap; }
+  .repo-path { min-width: 0; overflow-wrap: anywhere; }
+}
 
 .icon-btn {
   display: inline-grid; place-items: center; width: 38px; height: 38px;
@@ -278,6 +280,18 @@ img { max-width: 100%; display: block; }
 .item-tools { display: flex; gap: .3rem; flex: none; }
 .item-body { padding: 1rem .95rem .35rem; }
 .item-card.nested { background: var(--bg-alt); }
+.item-heading { display: grid; min-width: 0; flex: 1; }
+.item-sub { font-size: .8rem; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.item-card.is-collapsed .item-head { border-bottom: 0; }
+.more-options { margin-top: .6rem; border-top: 1px dashed var(--border); padding-top: .6rem; }
+.more-options > summary { cursor: pointer; font-size: .85rem; color: var(--text-dim); font-weight: 600; }
+.more-options[open] > summary { margin-bottom: .6rem; }
+.resume-modes { display: grid; gap: .35rem; margin: .5rem 0; }
+.resume-mode { display: flex; gap: .6rem; align-items: center; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: .65rem .8rem; }
+.resume-mode.is-on { border-color: var(--accent); background: var(--accent-soft); }
+.resume-mode input { width: auto; }
+.order-row > input.order-name { width: 0; }
+.order-row .tool-btn[aria-pressed] { width: auto; padding-inline: .5rem; }
 
 .empty { border: 1px dashed var(--border-2); border-radius: var(--radius); padding: 1.1rem; text-align: center; font-size: .85rem; color: var(--text-dim); margin: 0 0 1rem; }
 .section-doc { font-size: .85rem; color: var(--text-dim); margin: -.4rem 0 1.1rem; max-width: 78ch; }
@@ -304,7 +318,7 @@ img { max-width: 100%; display: block; }
 }
 
 /* ── Theme builder ──────────────────────────────────────────────────── */
-.theme-gallery { display: grid; gap: .8rem; grid-template-columns: repeat(auto-fill, minmax(min(100%, 224px), 1fr)); margin-bottom: 1.5rem; }
+.theme-gallery { display: grid; gap:.9rem; grid-template-columns:repeat(auto-fill,minmax(min(100%,280px),1fr)); margin-bottom:1.5rem; }
 .theme-card {
   text-align: left; cursor: pointer; padding: 0; overflow: hidden;
   border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface);
@@ -313,15 +327,39 @@ img { max-width: 100%; display: block; }
 }
 .theme-card:hover { border-color: var(--border-2); transform: translateY(-2px); }
 .theme-card[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
-.theme-mock { height: 84px; padding: .6rem .7rem; display: grid; align-content: center; gap: .3rem; }
-.theme-mock .m-bar { height: 7px; border-radius: 3px; }
-.theme-mock .m-chip { height: 9px; width: 34px; border-radius: 999px; }
-.theme-body { padding: .7rem .8rem .8rem; border-top: 1px solid var(--border); }
+.theme-site-thumb { position:relative; display:block; height:240px; overflow:hidden; background:var(--bg); border-bottom:1px solid var(--border); }
+.theme-site-thumb iframe { position:absolute; inset:0 auto auto 0; display:block; width:1440px; height:1200px; border:0; pointer-events:none; transform:scale(.2); transform-origin:top left; background:var(--bg); }
+.theme-site-thumb .theme-loading { position:absolute; inset:0; display:grid; place-items:center; color:var(--text-dim); font:500 .72rem/1.4 var(--font-mono); background:var(--surface); }
+.theme-site-thumb.is-ready .theme-loading { display:none; }
+.theme-mock { min-height: 150px; padding: .65rem; display: grid; gap: .55rem; align-content: start; }
+.theme-mock .m-nav { display:flex; align-items:center; justify-content:space-between; padding-bottom:.42rem; border-bottom:1px solid var(--pm-border); }
+.theme-mock .m-logo { width:34%; height:6px; border-radius:999px; background:var(--pm-text); }
+.theme-mock .m-navlinks { display:flex; gap:3px; }
+.theme-mock .m-navlinks i { display:block; width:14px; height:4px; border-radius:999px; background:var(--pm-dim); }
+.theme-mock .m-eyebrow { width:32%; height:4px; border-radius:999px; background:var(--pm-accent); }
+.theme-mock .m-title { width:78%; height:13px; border-radius:3px; background:var(--pm-text); }
+.theme-mock .m-copy { display:grid; gap:3px; }
+.theme-mock .m-copy i { display:block; height:4px; border-radius:999px; background:var(--pm-mid); opacity:.8; }
+.theme-mock .m-copy i:last-child { width:67%; }
+.theme-mock .m-actions { display:flex; gap:5px; }
+.theme-mock .m-button { width:44px; height:14px; border-radius:var(--pm-button-radius); background:var(--pm-accent); }
+.theme-mock .m-button.alt { background:transparent; border:1px solid var(--pm-border-2); }
+.theme-mock .m-cards { display:grid; grid-template-columns:1fr 1fr; gap:5px; }
+.theme-mock .m-card { height:29px; border:var(--pm-card-border) solid var(--pm-border); border-radius:var(--pm-radius); background:var(--pm-surface); box-shadow:var(--pm-shadow); padding:5px; }
+.theme-mock .m-card::before,.theme-mock .m-card::after { content:""; display:block; height:3px; border-radius:999px; background:var(--pm-text); width:68%; }
+.theme-mock .m-card::after { background:var(--pm-dim); width:88%; margin-top:5px; }
+.theme-mode-label { position:absolute; margin:.45rem; padding:.1rem .35rem; border-radius:999px; background:color-mix(in srgb,var(--pm-surface) 88%,transparent); color:var(--pm-mid); font:600 .58rem/1.4 var(--font-mono); text-transform:uppercase; letter-spacing:.08em; }
+.theme-preview-wrap { position:relative; display:block; }
+.theme-body { display:block; padding: .7rem .8rem .8rem; border-top: 1px solid var(--border); }
 .theme-body strong { display: block; color: var(--text); font-size: .9rem; }
 .theme-body span { display: block; font-size: .76rem; color: var(--text-dim); margin-top: .15rem; }
 .theme-fonts { font-family: var(--font-mono); font-size: .68rem; color: var(--text-dim); margin-top: .45rem; }
 .theme-selected { font-family: var(--font-mono); font-size: .68rem; color: var(--accent); margin-top: .35rem; }
 .theme-bar { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; margin-bottom: 1.2rem; }
+.theme-live-shell { margin:1rem 0 1.5rem; padding:.75rem; border:1px solid var(--border); border-radius:var(--radius); background:var(--bg-alt); }
+.theme-live-frame-wrap { width:100%; margin:auto; transition:width .2s var(--ease); }
+.theme-live-frame-wrap.is-mobile { width:min(100%,390px); }
+.theme-live-frame { display:block; width:100%; height:min(68vh,680px); border:1px solid var(--border); border-radius:var(--radius-sm); background:white; }
 
 .mode-switch { display: inline-flex; gap: .3rem; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: .2rem; }
 .mode-switch button { border: 0; background: none; cursor: pointer; padding: .3rem .7rem; border-radius: 6px; font-family: var(--font-mono); font-size: .76rem; color: var(--text-dim); }
@@ -424,6 +462,14 @@ img { max-width: 100%; display: block; }
 /* ── Preview ────────────────────────────────────────────────────────── */
 .preview-bar { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem; margin-bottom: .9rem; }
 .preview-frame { width: 100%; height: min(76vh, 900px); border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg); }
+@media (max-width: 619px) {
+  .var-row { grid-template-columns: minmax(0, 1fr); }
+  .var-ctl { flex-wrap: wrap; justify-content: flex-start; }
+  .mode-switch { flex-wrap: wrap; }
+  .save-bar { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .save-bar .field { grid-column: 1 / -1; min-width: 0; }
+  .save-bar .btn { min-width: 0; white-space: normal; text-align: center; }
+}
 
 main { padding-bottom: 3rem; }
 .icon { width: 1em; height: 1em; flex: none; }
@@ -438,7 +484,7 @@ main { padding-bottom: 3rem; }
 <header class="site-header">
   <div class="container">
     <nav class="nav" aria-label="Admin">
-      <a class="brand" href="index.html">portfolio<span class="dot">.</span>dev <span class="tool">/ content admin</span></a>
+      <a class="brand" href="index.html">my portfolio <span class="tool">/ manage content</span></a>
       <div class="nav-actions">
         <a class="btn btn-ghost btn-sm" href="index.html">← View site</a>
         <button class="btn btn-ghost btn-sm" id="disconnect-btn" type="button" hidden>Disconnect</button>
@@ -455,13 +501,21 @@ main { padding-bottom: 3rem; }
   <!-- ═══════════════ CONNECT ═══════════════ -->
   <section class="connect" id="connect-view" aria-labelledby="connect-title">
     <div class="connect-card">
-      <p class="eyebrow">Connect</p>
-      <h1 id="connect-title">Edit your portfolio content</h1>
+      <p class="eyebrow">Private maintenance page</p>
+      <h1 id="connect-title">Update your live portfolio</h1>
       <p>
-        This page reads <code>data.json</code> straight from your repository, lets you
-        edit it, and commits it back. The token lives in a JavaScript variable for this
-        tab only — never stored, never in the URL, never committed.
+        Use this page whenever you want to change the portfolio after publishing it to
+        GitHub Pages. It loads your current content, gives you friendly forms and saves
+        the result as a GitHub commit. GitHub Pages then updates the public site.
       </p>
+
+      <div class="notice info">
+        <strong>How to use this page</strong><br>
+        1. Create or reuse a fine-grained GitHub token for this repository.<br>
+        2. Give it <strong>Contents: Read and write</strong> permission only.<br>
+        3. Paste it below, connect, edit a section, then choose <strong>Save to GitHub</strong>.<br>
+        Your token stays only in this open tab and is discarded when you disconnect or close it.
+      </div>
 
       <div class="notice err" id="insecure-warning" hidden>
         This page is being served over plain HTTP. Don't paste a token here — open it over
@@ -493,7 +547,8 @@ main { padding-bottom: 3rem; }
                  placeholder="github_pat_…" aria-describedby="token-hint">
           <span class="hint" id="token-hint">
             Needs exactly one permission on this repository: <strong>Contents: Read and write</strong>.
-            See SETUP.md.
+            <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener noreferrer">Create a fine-grained token on GitHub ↗</a>
+            and select only this portfolio repository. The token is never saved by this page.
           </span>
         </div>
         <button class="btn btn-primary btn-block" type="submit" id="connect-btn">Connect to repository</button>
@@ -530,8 +585,12 @@ main { padding-bottom: 3rem; }
 <script src="js/core.js"></script>
 <script src="js/icons.js"></script>
 <script src="js/themes.js"></script>
+<script src="js/skeletons.js"></script>
+<script src="js/packs.js"></script>
+<script src="js/looks.js"></script>
 <script src="js/layouts.js"></script>
 <script src="js/resume.js"></script>
+<script src="js/editor.js"></script>
 <script src="js/admin.js"></script>
 </body>
 </html>

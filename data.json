@@ -1,286 +1,236 @@
 {
-  "theme": {
-    "preset": "crimson",
-    "mode": "dark",
-    "iconAnimation": "lift",
-    "fonts": {},
-    "vars": {
-      "common": {},
-      "dark": {},
-      "light": {}
-    },
-    "templates": []
-  },
   "pdf": {
-    "template": "compact",
+    "pages": "auto",
     "paper": "a4",
-    "exclude": []
+    "exclude": [],
+    "template": "technical",
+    "includeVisual": false
   },
+  "theme": {
+    "mode": "dark",
+    "vars": {
+      "dark": {},
+      "light": {},
+      "common": {}
+    },
+    "fonts": {},
+    "preset": "minimal-light",
+    "variation": "standard",
+    "customThemes": [],
+    "iconAnimation": "lift"
+  },
+  "skills": [
+    {
+      "icon": "",
+      "items": [
+        "Service Catalogs",
+        "Flow Designer",
+        "Service Portal",
+        "Service Operations Workspace (SOW)",
+        "UI Builder",
+        "ITSM",
+        "HRSD (Basics)",
+        "Integrations",
+        "Database Views",
+        "Transform Maps",
+        "Update Sets Migration"
+      ],
+      "category": "ServiceNow Modules"
+    },
+    {
+      "icon": "",
+      "items": [
+        "JavaScript",
+        "Glide API",
+        "Business Rules",
+        "Client Scripts",
+        "Script Includes",
+        "UI Policies",
+        "UI Actions"
+      ],
+      "category": "Scripting & Development"
+    }
+  ],
+  "profile": {
+    "name": "Anthara S",
+    "about": [
+      "ServiceNow Developer with 7+ years of IT experience in designing, developing, and implement- ing ITSM solutions. Expertise in Service Catalogs, Incident, Problem, Change, and Release Management (ITSM Module), with hands-on experience in Service Portal, Service Op- erations Workspace, UI Builder, Flow Designer, Integrations, and platform development . Demonstrated ability to work effectively in a team and as an individual contributor, ensuring timely delivery of successful project outcomes."
+    ],
+    "email": "antharasundaramurthy@gmail.com",
+    "links": [
+      {
+        "url": "https://www.linkedin.com/in/anthara-sundaramurthy-6756a8b9/",
+        "icon": "linkedin",
+        "label": "LinkedIn"
+      }
+    ],
+    "phone": "8498093234",
+    "photo": {
+      "alt": "",
+      "src": ""
+    },
+    "title": "Senior ServiceNow Developer",
+    "status": "Open to new roles",
+    "ogImage": {
+      "alt": "",
+      "src": ""
+    },
+    "siteUrl": "",
+    "tagline": "ServiceNow Developer with 7+ years of IT experience in designing, developing, and implement- ing ITSM solutions.",
+    "location": "",
+    "brandIcon": "",
+    "resumeUrl": "assets/anthara-s-resume-86092bc4.pdf",
+    "shortName": "Anthara",
+    "resumeMode": "file",
+    "resumeName": "ANTHARA S Resume.pdf",
+    "yearsRounding": "",
+    "experienceYears": ""
+  },
+  "projects": [],
+  "sections": [],
+  "template": {
+    "look": "engineering-blueprint",
+    "pack": "software-it",
+    "skeleton": "engineering-blueprint"
+  },
+  "education": [
+    {
+      "degree": "Bachelor’s in Computer Science and Systems Engineering",
+      "detail": "",
+      "endYear": "2019",
+      "startYear": "",
+      "institution": "Sree Vidyanikethan Engineering College, Tirupati"
+    }
+  ],
+  "experience": [
+    {
+      "id": "exp-1",
+      "role": "Senior Application Consultant",
+      "tech": [
+        "Service Catalogs",
+        "Flow Designer",
+        "Service Portal",
+        "Service Operations Workspace (SOW)",
+        "UI Builder",
+        "Database Views",
+        "Transform Maps",
+        "Business Rules"
+      ],
+      "company": "IBM India Pvt. Ltd.",
+      "endDate": null,
+      "summary": "",
+      "location": "",
+      "startDate": "2025-08",
+      "highlights": [
+        "Developed and maintained Service Catalogs using Flow Designer, implementing end-to-end fulfillment processes based on business requirements.",
+        "Configured custom tables, forms, and lists to meet functional and business requirements .",
+        "Developed and configured Business Rules, Client Scripts, Catalog Client Scripts, Script Includes, UI Policies, and UI Actions to implement business logic and enhance platform functionality.",
+        "Built and customized Service Portal components, including Pages and Widgets, to enhance user experience.",
+        "Worked extensively with Service Operations Workspace (SOW) and UI Builder to enhance workspace functionality and user experience, implementing ’My Approvals’ page for end-user approval management.",
+        "Designed and configured Database Views by joining custom and out-of-box tables (Approvals, Requested Items, Service Agreements) to consolidate workspace information .",
+        "Developed and configured Transform Maps using Data Sources to support data migration and record management.",
+        "Utilized System Dependency checks to identify potential downstream impacts of table and field changes, documenting impacts and updating dependency comments."
+      ]
+    },
+    {
+      "id": "exp-2",
+      "role": "Senior Infra Developer",
+      "tech": [
+        "Flow Designer",
+        "Integrations",
+        "JavaScript",
+        "Business Rules",
+        "Client Scripts",
+        "Script Includes",
+        "UI Policies",
+        "UI Actions"
+      ],
+      "company": "Cognizant Technology Solutions",
+      "endDate": "2025-07",
+      "summary": "",
+      "location": "",
+      "startDate": "2022-07",
+      "highlights": [
+        "Developed and maintained Service Catalog Items and Record Producers using Workflows and Flow Designers.",
+        "Implemented third-party integrations using Flow Designer triggered on Catalog Item creation to update corresponding records.",
+        "Created Inbound Email flows, Scheduled Jobs, Dashboards, and Reports.",
+        "Developed Business Rules, Client Scripts, Script Includes, UI Actions, and UI Policies using JavaScript.",
+        "Managed multiple modules including Major Incident Management, Service Operations Workspace Universal Request, and basic HRSD.",
+        "Created and managed Update Sets to move customizations seamlessly between systems ."
+      ]
+    },
+    {
+      "id": "exp-3",
+      "role": "Senior Systems Engineer",
+      "tech": [
+        "Service Portal",
+        "ITSM",
+        "Database Views",
+        "Business Rules",
+        "Client Scripts",
+        "Script Includes",
+        "UI Policies"
+      ],
+      "company": "Infosys Limited",
+      "endDate": "2022-06",
+      "summary": "Client: Telstra (Domain: Telecom) Role: ServiceNow Developer",
+      "location": "",
+      "startDate": "2019-09",
+      "highlights": [
+        "Cyber Security (Security Operations): Developed scoped application solutions using Business Rules, Client Scripts, ACLs, UI Policies, Script Includes, and UI Pages . Customized Service Portal pages and widgets. Created Database Views and managed user access control and roles.",
+        "GetHelp: Implemented ITSM modules including Incident Management (with ITAM monitoring) and Change Management (CRQ creation and pre-prod to prod deployment via update sets)."
+      ]
+    }
+  ],
   "sectionOrder": [
-    "about",
+    "projects",
     "skills",
     "experience",
-    "projects",
+    "about",
     "certifications",
     "education"
   ],
-  "hiddenSections": [],
-  "sections": [],
-  "profile": {
-    "name": "Lakshmi Chaitanya Reddy Idamakanti",
-    "shortName": "Chaitanya Reddy",
-    "title": "Senior ServiceNow Developer",
-    "yearsRounding": "half",
-    "experienceYears": "",
-    "tagline": "I build the workflows, integrations and custom applications that make ServiceNow actually work for the people using it — across CSM, HRSD and ITSM, with {{years}}+ years of production delivery behind me.",
-    "status": "Open to ServiceNow platform roles",
-    "location": "Hyderabad, India",
-    "email": "lakshmichaitanyareddyi@gmail.com",
-    "phone": "+91 9959749269",
-    "resumeUrl": "/Lakshmi_Chaitanya_Reddy_Idamakanti_ServiceNow_Developer.pdf",
-    "siteUrl": "https://lakshmichaitanyareddy.github.io/",
-    "about": [
-      "I'm a ServiceNow developer with {{years}}+ years of experience designing and shipping solutions across Customer Service Management, HRSD and ITSM. Most of my work sits where the platform meets everything else: eBonding integrations, CMDB alignment, REST/SOAP services, and the custom scripting that holds a real business process together.",
-      "Day to day that means Flow Designer automations, Script Includes and Business Rules written to be readable a year later, Service Portal widgets and UI Builder components, and integration layers designed to be reused rather than rebuilt for every customer. I care about ITIL-sane process design, ACLs that actually hold, and handing business users tooling they can run without me.",
-      "Outside of delivery I use enterprise-approved AI tooling to audit custom applications and map end-to-end platform architecture ahead of migrations — the unglamorous documentation work that makes the risky changes survivable."
-    ],
-    "links": [
-      {
-        "label": "LinkedIn",
-        "url": "https://www.linkedin.com/in/lakshmi-chaitanya-reddy-idamakanti-235a1b212/",
-        "icon": "linkedin"
-      },
-      {
-        "label": "GitHub",
-        "url": "https://github.com/LakshmiChaitanyaReddy",
-        "icon": "github"
-      },
-      {
-        "label": "ServiceNow Community",
-        "url": "https://www.servicenow.com/community/user/viewprofilepage/user-id/24805",
-        "icon": "globe"
-      }
-    ]
+  "sectionLabels": {
+    "about": "Engineering approach",
+    "skills": "Technical specification",
+    "projects": "Systems & builds",
+    "education": "Education",
+    "experience": "Delivery history",
+    "certifications": "Credentials"
   },
-  "experience": [
-    {
-      "id": "exp-fanatics",
-      "company": "Fanatics",
-      "role": "Senior ServiceNow Developer",
-      "startDate": "2026-05",
-      "endDate": null,
-      "location": "Hyderabad, India",
-      "summary": "Platform development and migration groundwork for a large custom ServiceNow estate.",
-      "highlights": [
-        "**AI-driven workflow & integration optimisation** — used enterprise-approved AI tooling and the ServiceNow SDK to audit custom applications, automate repetitive design work, and map end-to-end architecture diagrams for platform migration planning.",
-        "**Slack Spoke & multi-channel approvals** — engineered dynamic approval payloads with Flow Designer and REST integrations so requests and notifications move across platforms without manual chasing.",
-        "**Migration strategy** — documented current-state architecture and dependency maps to de-risk moving custom applications between instances."
-      ],
-      "tech": [
-        "Flow Designer",
-        "REST",
-        "Slack Spoke",
-        "ServiceNow SDK"
-      ]
-    },
-    {
-      "id": "exp-fis",
-      "company": "FIS",
-      "role": "Software Engineer II",
-      "startDate": "2022-06",
-      "endDate": "2026-03",
-      "location": "Hyderabad, India",
-      "summary": "End-to-end CSM and ITSM delivery: scripting, integrations, portal work and the testing around it.",
-      "highlights": [
-        "**CSM & ITSM implementation** — architected and customised CSM cases alongside Incident, Problem, Change and Catalog, keeping solution design aligned to ITIL practice.",
-        "**Server & client scripting** — authored Script Includes, Business Rules, UI Policies and Glide API logic for complex CRUD operations and workflow execution.",
-        "**Flow Designer & process automation** — configured OOTB workflows and built custom flows for case routing, request fulfilment and incident auto-prioritisation.",
-        "**CMDB & API integrations** — developed eBonding integrations over REST/SOAP connecting third-party enterprise platforms to CMDB data models.",
-        "**Service Portal & UI Builder** — built and enhanced custom widgets and UI Builder components that improved external user engagement and internal support usability.",
-        "**Testing & quality assurance** — authored UAT scripts, led functional validation, and ran root-cause troubleshooting to keep the platform stable.",
-        "**Agile & governance** — participated in Agile ceremonies and stakeholder design reviews, enforcing platform controls through ACLs and secure API protocols."
-      ],
-      "tech": [
-        "CSM",
-        "ITSM",
-        "Script Includes",
-        "Business Rules",
-        "Glide APIs",
-        "REST",
-        "SOAP",
-        "CMDB",
-        "Service Portal",
-        "UI Builder",
-        "Flow Designer"
-      ]
-    }
-  ],
-  "projects": [
-    {
-      "id": "proj-csm-itsm",
-      "title": "CSM–ITSM Customer Incident Communication Framework",
-      "featured": true,
-      "blurb": "Bidirectional REST sync that keeps customers and engineers looking at the same truth.",
-      "problem": "Customer-facing CSM cases and internal ITSM incidents lived in separate worlds, so customers had to call in for updates that already existed inside the platform.",
-      "approach": "Built a bidirectional REST sync between CSM cases and ITSM incidents with mapped state models and event-driven proactive notifications.",
-      "result": "Real-time status parity across both records and a measurable drop in tier-1 \"any update?\" inquiry load.",
-      "tech": [
-        "CSM",
-        "ITSM",
-        "REST",
-        "Business Rules"
-      ],
-      "links": []
-    },
-    {
-      "id": "proj-jira-migration",
-      "title": "JIRA → ServiceNow Data Migration",
-      "featured": true,
-      "blurb": "200K+ records moved with reconciliation checks and no performance debt left behind.",
-      "problem": "200K+ historical records sat in JIRA while delivery had already moved to ServiceNow, splitting history across two systems.",
-      "approach": "Wrote custom REST migration scripts on Glide APIs with batching, field mapping, reconciliation checks and post-migration query tuning.",
-      "result": "All 200K+ records migrated with zero data loss and no degradation in platform performance afterwards.",
-      "tech": [
-        "Glide APIs",
-        "REST",
-        "Data Migration"
-      ],
-      "links": []
-    },
-    {
-      "id": "proj-ebonding",
-      "title": "eBonding & CMDB Integration Framework",
-      "featured": false,
-      "blurb": "A reusable integration spine instead of one-off connectors.",
-      "problem": "Every new customer integration was written from scratch, so external data landed in CMDB inconsistently and maintenance costs compounded.",
-      "approach": "Designed a reusable eBonding architecture over REST/SOAP with a shared transform layer, error handling and retry semantics mapped to CMDB classes.",
-      "result": "New customer connections became a configuration exercise instead of a build, with consistent, trustworthy CMDB records.",
-      "tech": [
-        "eBonding",
-        "REST",
-        "SOAP",
-        "CMDB"
-      ],
-      "links": []
-    },
-    {
-      "id": "proj-catalog-builder",
-      "title": "Catalog Builder Enablement",
-      "featured": false,
-      "blurb": "Handed catalog authoring to the business without handing over the guardrails.",
-      "problem": "Every new catalog item — however trivial — queued behind the development team, stretching lead times for the business.",
-      "approach": "Configured Catalog Builder with guarded templates and supporting custom flows so non-technical owners could author and publish items within governance rails.",
-      "result": "Business users publish catalog items independently, and development lead time is reserved for work that genuinely needs code.",
-      "tech": [
-        "Catalog Builder",
-        "Flow Designer",
-        "Service Catalog"
-      ],
-      "links": []
-    },
-    {
-      "id": "proj-slack-approvals",
-      "title": "Slack Spoke & Multi-Channel Approvals",
-      "featured": false,
-      "blurb": "Approvals delivered where the approvers already are.",
-      "problem": "Approvals stalled because approvers lived in Slack while the requests lived in ServiceNow, so nothing moved until someone chased it.",
-      "approach": "Engineered dynamic approval payloads in Flow Designer, delivered through the Slack Spoke and REST integrations with context-aware routing.",
-      "result": "Approvals happen in-channel, with cross-platform notifications keeping requesters informed automatically.",
-      "tech": [
-        "Flow Designer",
-        "Slack Spoke",
-        "REST"
-      ],
-      "links": []
-    }
-  ],
-  "skills": [
-    {
-      "category": "Core Modules",
-      "icon": "layout-grid",
-      "items": [
-        "Incident",
-        "Change",
-        "Problem",
-        "Service Catalog",
-        "CSM",
-        "HRSD",
-        "CMDB"
-      ]
-    },
-    {
-      "category": "Platform & UI",
-      "icon": "workflow",
-      "items": [
-        "Flow Designer",
-        "Service Portal",
-        "Portal Widgets",
-        "UI Builder",
-        "Catalog Builder",
-        "UI Policies",
-        "ACLs"
-      ]
-    },
-    {
-      "category": "Scripting & APIs",
-      "icon": "code-2",
-      "items": [
-        "JavaScript (GlideScript)",
-        "Script Includes",
-        "Business Rules",
-        "Glide APIs",
-        "REST APIs",
-        "SOAP APIs",
-        "eBonding",
-        "HTML / CSS",
-        "SQL"
-      ]
-    },
-    {
-      "category": "Tooling & Practice",
-      "icon": "wrench",
-      "items": [
-        "ServiceNow SDK",
-        "Postman",
-        "SoapUI",
-        "GitHub",
-        "Slack Spoke",
-        "Agile / Scrum",
-        "UAT & QA",
-        "ITIL practices"
-      ]
-    }
-  ],
   "certifications": [
     {
-      "name": "Certified System Administrator",
-      "abbr": "CSA",
-      "issuer": "ServiceNow",
+      "abbr": "",
+      "icon": "",
+      "name": "ServiceNow Certified System Administrator (CSA)",
       "year": "",
+      "issuer": "",
       "credentialUrl": ""
     },
     {
-      "name": "Certified Application Developer",
-      "abbr": "CAD",
-      "issuer": "ServiceNow",
+      "abbr": "",
+      "icon": "",
+      "name": "ServiceNow Certified Application Developer (CAD)",
       "year": "",
+      "issuer": "",
       "credentialUrl": ""
     },
     {
-      "name": "Certified Implementation Specialist — HRSD",
-      "abbr": "CIS-HRSD",
-      "issuer": "ServiceNow",
+      "abbr": "",
+      "icon": "",
+      "name": "Certified Implementation Specialist - IT Service Management (CIS - ITSM)",
       "year": "",
+      "issuer": "",
+      "credentialUrl": ""
+    },
+    {
+      "abbr": "",
+      "icon": "",
+      "name": "Certified Implementation Specialist - Data Foundations (CIS - DF)",
+      "year": "",
+      "issuer": "",
       "credentialUrl": ""
     }
   ],
-  "education": [
-    {
-      "degree": "B.E. Computer Science",
-      "institution": "Sri Chandrasekharendra Saraswathi Viswa Mahavidyalaya",
-      "startYear": "2018",
-      "endYear": "2022",
-      "detail": "CGPA 9.47 / 10"
-    }
-  ]
+  "hiddenSections": []
 }
