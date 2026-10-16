@@ -2,7 +2,7 @@
    resume.js — builds a real resume document from data.json, and exports it.
 
    Owns three registries:
-     TEMPLATES   eight print layouts
+     TEMPLATES   ten print layouts (five featured)
      EXPORTS     eight output formats
      css()       the resume stylesheet, as a string
 
@@ -34,7 +34,24 @@
      `railFirst` puts the side column ahead of the main column in the DOM,
      which is what lets the sidebar layout use a plain float.
      ==================================================================== */
+  /* The first five are the featured choices in the builder; the rest stay
+     available for existing sites. */
   const TEMPLATES = [
+    { id: "ats", name: "ATS-clean", railFirst: false, featured: true,
+      blurb: "Single column, standard section names, no colour, no columns, no glyphs. Built to be parsed by applicant tracking systems, not admired.",
+      sketch: ["NAME", "email | phone | city", "", "PROFESSIONAL EXPERIENCE", "Company — Role", "05/2026 - Present", "- bullet", "", "SKILLS", "Category: a, b, c"] },
+    { id: "modern", name: "Modern", railFirst: false, featured: true,
+      blurb: "Accent rule under the name, tighter leading, skills set in two columns.",
+      sketch: ["███████████  name", "━━━━━━━━━━━━━━━━━━", "EXPERIENCE", "role         date", "  • bullet", "SKILLS  a,b │ c,d"] },
+    { id: "executive", name: "Executive", railFirst: false, featured: true,
+      blurb: "Serif name, leadership summary in a panel, scope and outcomes per role. Understated and senior.",
+      sketch: ["      NAME", "   title · contact", "│ summary of leadership", "EXPERIENCE", "COMPANY        date", "Role", "  – outcome"] },
+    { id: "technical", name: "Technical", railFirst: false, featured: true, skillsFirst: true,
+      blurb: "Skills first, monospace headings and the stack on every role. For engineers and data people.",
+      sketch: ["name // title", "> skills: go, sql, k8s", "## experience", "role @ company  date", "  - bullet", "  [go] [kafka]"] },
+    { id: "academic", name: "Academic", railFirst: false, featured: true,
+      blurb: "Serif, dense, full width. Long lists of publications, talks and courses.",
+      sketch: ["      Name", "  dept · email", "", "EDUCATION", "Degree, School  2022", "PUBLICATIONS", "1. Title. Venue."] },
     { id: "compact", name: "Compact", railFirst: false,
       blurb: "One column, dense. The most content per page — good for a long history.",
       sketch: ["███████████  name", "──────────────────", "EXPERIENCE", "role ────────  date", "  • bullet", "  • bullet", "PROJECTS"] },
@@ -49,21 +66,14 @@
       sketch: ["███████████  name", "2026 │ role", "     │  • bullet", "2022 │ role", "     │  • bullet"] },
     { id: "minimal", name: "Minimal", railFirst: false,
       blurb: "No rules, no colour, no tag lists. Text and whitespace only.",
-      sketch: ["name", "title · contact", "", "EXPERIENCE", "role, company  date", "  bullet"] },
-    { id: "ats", name: "ATS-safe", railFirst: false,
-      blurb: "Single column, standard section names, no colour, no columns, no glyphs. Built to be parsed by applicant tracking systems, not admired.",
-      sketch: ["NAME", "email | phone | city", "", "PROFESSIONAL EXPERIENCE", "Company — Role", "05/2026 - Present", "- bullet", "", "SKILLS", "Category: a, b, c"] },
-    { id: "modern", name: "Modern", railFirst: false,
-      blurb: "Accent rule under the name, tighter leading, skills set in two columns.",
-      sketch: ["███████████  name", "━━━━━━━━━━━━━━━━━━", "EXPERIENCE", "role         date", "  • bullet", "SKILLS  a,b │ c,d"] },
-    { id: "academic", name: "Academic", railFirst: false,
-      blurb: "Serif, dense, full width. Long lists of publications, talks and courses.",
-      sketch: ["      Name", "  dept · email", "", "EDUCATION", "Degree, School  2022", "PUBLICATIONS", "1. Title. Venue."] }
+      sketch: ["name", "title · contact", "", "EXPERIENCE", "role, company  date", "  bullet"] }
   ];
 
   const T_INDEX = {};
   TEMPLATES.forEach(function (t) { T_INDEX[t.id] = t; });
   const templateById = function (id) { return T_INDEX[id] || T_INDEX.compact; };
+  /* Layouts that only make sense on a web page stay off the resume by default. */
+  const VISUAL_LAYOUTS = ["gallery", "stats", "quotes", "testimonials", "logo_wall", "cta_band", "hero", "feature_grid", "reviews", "pricing_table", "faq", "ats_widget", "template_gallery", "steps", "comparison"];
 
   /* ====================================================================
      THE STYLESHEET
@@ -87,6 +97,8 @@
 
 "/* header */",
 ".r-head { margin-bottom: 5mm; }",
+".r-head::after { content: ''; display: table; clear: both; }",
+".r-photo { float: right; width: 19mm; height: 19mm; object-fit: cover; border-radius: 50%; margin: 0 0 2mm 4mm; }",
 ".r-name { font-size: 21pt; line-height: 1.08; margin-bottom: 1mm; }",
 ".r-title { font-size: 11pt; font-weight: 600; color: var(--r-accent); margin-bottom: 2mm; }",
 ".r-contact { font-size: 8.6pt; color: var(--r-mid); }",
@@ -95,7 +107,13 @@
 
 "/* sections */",
 ".r-sec { margin-top: 6mm; }",
-".r-sec:first-child { margin-top: 0; }",
+"/* Only the section that STARTS a column loses its top margin. The rail is",
+"   a genuine side column in the sidebar layout, but in every other template",
+"   it simply continues down the page after the main column — and there its",
+"   first section ('Skills', usually) needs the gap like any other, or its",
+"   heading lands flush against the last line above it. */",
+".r-main > .r-sec:first-child { margin-top: 0; }",
+".r-sidebar .r-rail > .r-sec:first-child { margin-top: 0; }",
 ".r-sec > h2 {",
 "  font-size: 9pt; text-transform: uppercase; letter-spacing: .12em;",
 "  margin-bottom: 2.5mm; padding-bottom: 1mm;",
@@ -162,7 +180,13 @@
 ".r-modern .r-head { border-bottom: 2.4pt solid var(--r-accent); padding-bottom: 3.5mm; }",
 ".r-modern { line-height: 1.4; }",
 ".r-modern .r-sec > h2 { color: var(--r-accent); border-bottom-color: var(--r-accent); }",
-".r-modern .r-rail .r-sec .r-kv { column-count: 2; column-gap: 6mm; }",
+"/* Two columns of short facts, so a four-line skills list does not run down",
+"   half a page. The count belongs to the SECTION: set on each paragraph, as",
+"   it was, every single line became its own two-column block — filling the",
+"   left column and leaving the right one empty, which is most of where the",
+"   blank space in the old PDFs came from. */",
+".r-modern .r-rail > .r-sec.r-multi { column-count: 2; column-gap: 7mm; }",
+".r-modern .r-rail > .r-sec.r-multi > h2 { column-span: all; }",
 
 "/* academic */",
 ".r-academic { font-family: var(--font-display, Georgia, serif); font-size: 10.5pt; line-height: 1.5; }",
@@ -170,6 +194,40 @@
 ".r-academic .r-summary { text-align: left; }",
 ".r-academic .r-sec > h2 { letter-spacing: .1em; border-bottom-width: .4pt; }",
 ".r-academic .r-bullets li::before { content: '\\2022'; color: var(--r-ink); }",
+
+"/* executive */",
+".r-executive { font-size: 10.2pt; line-height: 1.5; --r-accent: #1f2a44; }",
+".r-executive .r-head { text-align: center; padding-bottom: 3mm; border-bottom: 3pt double var(--r-ink); margin-bottom: 4mm; }",
+".r-executive .r-name { font-family: var(--font-display, Georgia, serif); font-size: 24pt; font-weight: 400; letter-spacing: .02em; }",
+".r-executive .r-title { color: var(--r-mid); font-weight: 400; letter-spacing: .12em; text-transform: uppercase; font-size: 9pt; }",
+".r-executive .r-summary { text-align: left; margin: 4mm 0 0; padding: 2.5mm 4mm; border-left: 2pt solid var(--r-accent); background: #f5f6f8; color: var(--r-ink); font-size: 9.8pt; }",
+".r-executive .r-sec > h2 { font-family: var(--font-display, Georgia, serif); font-variant: small-caps; text-transform: none; letter-spacing: .08em; font-size: 12pt; font-weight: 400; border-bottom: .5pt solid var(--r-ink); }",
+".r-executive .r-org { text-transform: uppercase; letter-spacing: .08em; font-size: 8.6pt; color: var(--r-accent); }",
+".r-executive .r-role { font-family: var(--font-display, Georgia, serif); font-size: 11pt; font-weight: 600; }",
+".r-executive .r-bullets li::before { content: '\\2013'; color: var(--r-ink); }",
+".r-executive .r-tags { display: none; }",
+
+"/* technical */",
+".r-technical { font-size: 9.6pt; line-height: 1.42; --r-accent: #0b6e4f; }",
+".r-technical .r-name { font-family: var(--font-mono, ui-monospace, monospace); font-size: 18pt; letter-spacing: -.02em; }",
+".r-technical .r-title { font-family: var(--font-mono, ui-monospace, monospace); font-size: 9.6pt; }",
+".r-technical .r-title::before { content: '// '; color: var(--r-dim); }",
+".r-technical .r-sec > h2 { font-family: var(--font-mono, ui-monospace, monospace); text-transform: lowercase; letter-spacing: 0; font-size: 10pt; border-bottom: .6pt dashed var(--r-line); }",
+".r-technical .r-sec > h2::before { content: '## '; color: var(--r-accent); }",
+".r-technical .r-tags { font-size: 7.8pt; color: var(--r-ink); margin-top: 1.2mm; }",
+".r-technical .r-rail .r-kv { font-family: var(--font-mono, ui-monospace, monospace); font-size: 8.8pt; }",
+".r-technical .r-bullets li::before { content: '-'; color: var(--r-accent); }",
+
+"/* page modes — one page tightens everything; two pages breathes */",
+".r-pages-1 { font-size: 9pt; line-height: 1.32; }",
+".r-pages-1 .r-head { margin-bottom: 3mm; }",
+".r-pages-1 .r-name { font-size: 17pt; }",
+".r-pages-1 .r-sec { margin-top: 3.6mm; }",
+".r-pages-1 .r-entry { margin-bottom: 2.2mm; }",
+".r-pages-1 .r-bullets li { font-size: 8.6pt; margin-bottom: .4mm; }",
+".r-pages-1 .r-tags { display: none; }",
+".r-pages-2 { line-height: 1.52; }",
+".r-pages-2 .r-sec { margin-top: 7mm; }",
 
 "/* page-level print rules */",
 "@media print {",
@@ -192,10 +250,16 @@
       .map(function (l) { return l.label || l.url; }));
   }
 
+  /* `r-multi` marks a section with enough items to be worth setting in two
+     columns. Each item is unbreakable, so a section holding one or two of
+     them cannot fill a second column — it would stack them on the left and
+     leave the right half blank, which looks like a bug rather than a
+     layout. The stylesheet only columnises sections that carry this. */
   function section(title, kids) {
     const children = kids.filter(Boolean);
     if (!children.length) return null;
-    return el("section", { class: "r-sec" }, el("h2", { text: title }), children);
+    return el("section", { class: "r-sec" + (children.length >= 3 ? " r-multi" : "") },
+      el("h2", { text: title }), children);
   }
 
   function entry(opts) {
@@ -218,15 +282,20 @@
     const d = data && typeof data === "object" ? data : {};
     const profile = d.profile && typeof d.profile === "object" ? d.profile : {};
     const tpl = templateById(opts.template || (d.pdf && d.pdf.template));
-    const exclude = arr(d.pdf && d.pdf.exclude).map(String);
+    const exclude = arr(opts.exclude || (d.pdf && d.pdf.exclude)).map(String);
     const skip = function (id) { return exclude.indexOf(id) !== -1; };
+    const pages = String(opts.pages || (d.pdf && d.pdf.pages) || "auto");
+    const includeVisual = opts.includeVisual !== undefined ? opts.includeVisual === true : !!(d.pdf && d.pdf.includeVisual);
+    /* One-page mode keeps every role but only the strongest bullets of older ones. */
+    const bulletCap = function (i) { return pages === "1" ? (i < 2 ? 4 : 2) : 99; };
 
     F.useTotals(d.experience, d.profile);
 
-    const root = el("div", { class: "resume r-" + tpl.id });
+    const root = el("div", { class: "resume r-" + tpl.id + (pages === "1" || pages === "2" ? " r-pages-" + pages : "") });
 
     const contacts = contactLine(profile);
     root.appendChild(el("header", { class: "r-head" },
+      tpl.id !== "ats" && profile.photo && has(profile.photo.src) && el("img", { class: "r-photo", src: profile.photo.src, alt: profile.photo.alt || "Profile photo" }),
       el("h1", { class: "r-name", text: profile.name || "" }),
       has(profile.title) && el("p", { class: "r-title", text: profile.title }),
       contacts.length > 0 && el("p", { class: "r-contact" },
@@ -236,27 +305,29 @@
     /* main column */
     const experience = !skip("experience") && arr(d.experience).length > 0 &&
       section(tpl.id === "ats" ? "Professional Experience" : "Experience",
-        F.byStartDesc(d.experience, "startDate").map(function (job) {
+        F.byStartDesc(d.experience, "startDate").map(function (job, i) {
           return entry({
             when: tpl.id === "ats"
               ? atsRange(job.startDate, job.endDate)
               : F.fmtRange(job.startDate, job.endDate, true),
             role: job.role || job.company || "Role",
             org: job.company, loc: job.location,
-            note: job.summary, bullets: job.highlights, tags: job.tech
+            note: pages === "1" ? "" : job.summary, bullets: arr(job.highlights).slice(0, bulletCap(i)), tags: job.tech
           });
         }));
 
     const projects = !skip("projects") && arr(d.projects).length > 0 &&
       section(tpl.id === "ats" ? "Projects" : "Selected projects",
         arr(d.projects).slice().sort(function (a, b) { return (b.featured === true) - (a.featured === true); })
+          .slice(0, pages === "1" ? 3 : 100)
           .map(function (p) {
             const line = [p.result, p.approach, p.blurb].filter(has)[0];
             return entry({ role: p.title || "Project", note: line, tags: p.tech });
           }));
 
     const custom = arr(d.sections).filter(function (s) {
-      return has(s.title) && arr(s.items).length && !skip(F.slug(s.id || s.title));
+      return has(s.title) && arr(s.items).length && !skip(F.slug(s.id || s.title)) &&
+        (includeVisual || VISUAL_LAYOUTS.indexOf(s.layout) === -1);
     }).map(function (sec) {
       return section(sec.title, arr(sec.items).map(function (it) {
         return entry({
@@ -290,8 +361,8 @@
           bits.length ? el("span", { text: " · " + bits.join(" · ") }) : null);
       }));
 
-    const main = el("div", { class: "r-main" }, [experience, projects].concat(custom).filter(Boolean));
-    const rail = el("div", { class: "r-rail" }, [skills, certs, education].filter(Boolean));
+    const main = el("div", { class: "r-main" }, (tpl.skillsFirst ? [skills, experience, projects] : [experience, projects]).concat(custom).filter(Boolean));
+    const rail = el("div", { class: "r-rail" }, (tpl.skillsFirst ? [certs, education] : [skills, certs, education]).filter(Boolean));
 
     if (tpl.railFirst) { root.appendChild(rail); root.appendChild(main); }
     else { root.appendChild(main); root.appendChild(rail); }
@@ -515,6 +586,79 @@
     return JSON.stringify(out, null, 2) + "\n";
   }
 
+  /* Rough inverse of toJsonResume, for the builder's Import feature
+     (js/app.js). Only basics/work/projects/education/certificates/skills
+     have a canonical home; anything else (publications, awards,
+     volunteer, languages, interests, references) becomes one new
+     sections[] entry per array, using the existing "list" layout, so it
+     goes through the same validateSite() path as everything else rather
+     than growing new top-level fields. */
+  function fromJsonResume(json) {
+    const j = json || {}, b = j.basics || {};
+    const out = { profile: {} };
+
+    if (has(b.name)) out.profile.name = b.name;
+    if (has(b.label)) out.profile.title = b.label;
+    if (has(b.email)) out.profile.email = b.email;
+    if (has(b.phone)) out.profile.phone = b.phone;
+    if (has(b.url)) out.profile.siteUrl = b.url;
+    if (has(b.summary)) out.profile.tagline = b.summary;
+    if (has(b.image)) out.profile.photo = { src: b.image, alt: "" };
+    if (b.location && (has(b.location.city) || has(b.location.countryCode))) {
+      out.profile.location = [b.location.city, b.location.countryCode].filter(has).join(", ");
+    }
+    if (arr(b.profiles).length) {
+      out.profile.links = arr(b.profiles).filter(function (p) { return has(p.url); })
+        .map(function (p) { return { label: p.network || "", url: p.url }; });
+    }
+
+    if (arr(j.work).length) {
+      out.experience = arr(j.work).map(function (w) {
+        return {
+          company: w.name || "", role: w.position || "", location: w.location || "",
+          startDate: w.startDate || "", endDate: w.endDate || "",
+          summary: w.summary || "", highlights: arr(w.highlights), tech: arr(w.keywords)
+        };
+      });
+    }
+    if (arr(j.projects).length) {
+      out.projects = arr(j.projects).map(function (p) {
+        return { title: p.name || "", blurb: p.description || "", tech: arr(p.keywords) };
+      });
+    }
+    if (arr(j.education).length) {
+      out.education = arr(j.education).map(function (e) {
+        return { institution: e.institution || "", degree: e.studyType || "", startYear: (e.startDate || "").slice(0, 4), endYear: (e.endDate || "").slice(0, 4), detail: e.score || "" };
+      });
+    }
+    if (arr(j.certificates).length) {
+      out.certifications = arr(j.certificates).map(function (c) {
+        return { name: c.name || "", issuer: c.issuer || "", year: (c.date || "").slice(0, 4), credentialUrl: c.url || "" };
+      });
+    }
+    if (arr(j.skills).length) {
+      out.skills = arr(j.skills).map(function (s) { return { category: s.name || "", items: arr(s.keywords) }; });
+    }
+
+    /* Anything with no canonical home in data.json. */
+    const extras = [
+      ["publications", "Publications", function (p) { return { title: p.name, meta: p.releaseDate, subtitle: p.publisher, links: p.url ? [{ label: "View", url: p.url }] : [] }; }],
+      ["awards", "Awards", function (a) { return { title: a.title, meta: a.date, subtitle: a.awarder, body: a.summary }; }],
+      ["volunteer", "Volunteering", function (v) { return { title: v.position, meta: v.startDate, subtitle: v.organization, body: v.summary }; }],
+      ["languages", "Languages", function (l) { return { title: l.language, subtitle: l.fluency }; }],
+      ["interests", "Interests", function (i) { return { title: i.name, tags: arr(i.keywords) }; }],
+      ["references", "References", function (r) { return { title: r.name, body: r.reference }; }]
+    ];
+    out.sections = [];
+    extras.forEach(function (spec) {
+      const list = arr(j[spec[0]]);
+      if (!list.length) return;
+      out.sections.push({ id: spec[0], title: spec[1], layout: "list", items: list.map(spec[2]) });
+    });
+
+    return out;
+  }
+
   /* ====================================================================
      STANDALONE HTML / WORD
      ==================================================================== */
@@ -726,6 +870,7 @@
     toText: toText,
     toMarkdown: toMarkdown,
     toJsonResume: toJsonResume,
+    fromJsonResume: fromJsonResume,
     toHtml: toHtml,
     toWord: toWord,
     toImage: toImage,

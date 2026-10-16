@@ -1,5 +1,5 @@
 /* ==========================================================================
-   site.js — boots index.html. Load last.
+   site.js — boots site.html (the portfolio renderer). Load last.
 
    Responsibilities: check every module arrived, apply the theme, fetch
    data.json (or take it over postMessage in preview mode), wire the chrome,
@@ -9,7 +9,7 @@
   "use strict";
 
   const PF = window.PF;
-  const REQUIRED = ["core", "icons", "themes", "layouts", "resume", "render"];
+  const REQUIRED = ["core", "icons", "themes", "skeletons", "layouts", "resume", "render"];
 
   /* ------------------------------------------------------------------
      0. Did every file actually load? A missing script used to degrade
@@ -34,7 +34,7 @@
     const h = document.createElement("h2");
     h.textContent = missing.length === 1 ? "A script file is missing" : missing.length + " script files are missing";
     const p = document.createElement("p");
-    p.textContent = "The page loaded but these files didn't. Commit them next to index.html and redeploy:";
+    p.textContent = "The page loaded but these files didn't start. Deploy them in a js/ folder next to this page. If a file is already there, it may contain a JavaScript error or an older cached copy:";
     const list = document.createElement("p");
     list.className = "error-detail";
     list.textContent = missing.map(function (m) { return (PF && PF.FILE_OF && PF.FILE_OF[m]) || m; }).join("\n");
@@ -53,9 +53,24 @@
   /* ------------------------------------------------------------------
      1. State + refs
      ------------------------------------------------------------------ */
-  const PREVIEW = window.parent !== window &&
-                  new URLSearchParams(window.location.search).has("preview");
-  const DATA_URL = "data.json";
+  /* Preview mode: the builder drives this page with postMessage — from a
+     frame it embeds, or from a tab it opened ("Open in new tab"), so unsaved
+     edits show in both. Only that one window is listened to. */
+  const PREVIEW_HOST = window.parent !== window ? window.parent : (window.opener || null);
+  const PREVIEW = !!PREVIEW_HOST && new URLSearchParams(window.location.search).has("preview");
+  /* The renderer shows placeholders that only make sense while editing (the
+     resume button of a PDF that is built at publish time). */
+  if (PREVIEW) document.documentElement.setAttribute("data-pf-preview", "");
+  /* Static deploys (GitHub Pages) fetch the local data.json next to this
+     file, same as always. A hosted deploy of the service can instead set
+     <meta name="pf-data-url" content="/api/public/sites/SLUG"> in the HTML
+     it serves, and this page will fetch that URL instead — no other change
+     needed, because the API returns the exact same data.json shape. */
+  const DATA_META = document.querySelector('meta[name="pf-data-url"]');
+  const DATA_URL = (DATA_META && DATA_META.content) || "data.json";
+  const SLUG_META = document.querySelector('meta[name="pf-hosted-slug"]');
+  const HOSTED_SLUG = SLUG_META ? SLUG_META.content : "";
+  const HOSTED = !!(DATA_META && HOSTED_SLUG);                  // served by the service at /u/:slug
 
   let DATA = null;
   let themeMode = "dark";
@@ -184,8 +199,29 @@
   function setResumePreview(on, template, paper) {
     document.body.classList.toggle("resume-preview", !!on);
     document.body.classList.toggle("paper-letter", !!on && paper === "letter");
-    if (on) buildResume(template, paper);
+    if (on) { buildResume(template, paper); markPages(paper); }
     else if (resumeRoot) clear(resumeRoot);
+  }
+
+  /* PDF-like pages: the sheet grows in whole pages, with a break drawn where
+     each printed page ends (the same 14mm margins the PDF uses), and the
+     builder is told the page count so it can warn when "one page" runs over. */
+  function markPages(paper) {
+    if (!resumeRoot) return;
+    const run = function () {
+      Array.prototype.forEach.call(resumeRoot.querySelectorAll(".page-break-guide"), function (n) { n.remove(); });
+      const mm = 96 / 25.4, pageMm = paper === "letter" ? 279.4 : 297, inner = (pageMm - 28) * mm;
+      const content = resumeRoot.firstElementChild ? resumeRoot.firstElementChild.getBoundingClientRect().height : 0;
+      const pages = Math.max(1, Math.ceil((content - 2) / inner));
+      /* One continuous sheet: content breaks every (page − margins), so the
+         guides sit there; the sheet is sized to finish on a whole page. */
+      resumeRoot.style.minHeight = (28 + pages * (pageMm - 28)) + "mm";
+      for (let i = 1; i < pages; i++) {
+        resumeRoot.appendChild(el("div", { class: "page-break-guide", style: "top:" + (14 + i * (pageMm - 28)) + "mm", "aria-hidden": "true" }, el("span", { text: "Page " + (i + 1) })));
+      }
+      if (PREVIEW && content) PREVIEW_HOST.postMessage({ type: "portfolio:resume-pages", pages: pages, exact: content / inner }, "*");
+    };
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(run, run); else run();
   }
 
   /* ------------------------------------------------------------------
@@ -193,7 +229,10 @@
      ------------------------------------------------------------------ */
   function draw(data) {
     DATA = R.normalise(data);
-    themeMode = (DATA.theme && DATA.theme.mode) === "light" ? "light" : "dark";
+    /* A published portfolio always opens dark on a fresh page load. Preview
+       frames still honour the mode selected by the editor via postMessage,
+       and the public header toggle can switch the open tab to light. */
+    themeMode = PREVIEW && (DATA.theme && DATA.theme.mode) === "light" ? "light" : "dark";
     applyTheme();
 
     const pdf = DATA.pdf || {};
@@ -206,12 +245,156 @@
     if (sectionObserver) sectionObserver.disconnect();
 
     const result = R.paint(data, refs);
+    if (/^\/template-previews\/(?!blank(?:\/|$))/.test(window.location.pathname)) {
+      refs.main.prepend(el("p", { class: "sample-notice", text: "Fictional example portfolio — names, organisations, credentials and outcomes are sample content. Replace them with your own before publishing." }));
+    }
     if (resumeRoot) clear(resumeRoot);
 
     refs.main.setAttribute("aria-busy", "false");
     if (loadStatus) loadStatus.textContent = "Portfolio loaded.";
+    if (HOSTED && !PREVIEW) hostedChrome();
+    const label = document.querySelector('meta[name="pf-preview-label"]');
+    if (label && !document.getElementById("pf-preview-ribbon")) document.body.appendChild(el("div", { id: "pf-preview-ribbon", role: "note", text: label.content }));
     setupReveal();
     setupActiveNav(result.sections);
+    fitNav();
+  }
+
+  /* A template can have many sections (custom ones included), and label
+     lengths are the customer's. When the desktop links don't fit beside the
+     brand and the controls, the header falls back to the menu button rather
+     than wrapping onto two lines or pushing the controls off screen. */
+  function fitNav() {
+    const header = document.getElementById("site-header");
+    const list = refs.navList;
+    if (!header || !list) return;
+    header.classList.remove("nav-overflow");
+    if (document.body.classList.contains("is-sidenav") && window.innerWidth >= 960) return;
+    if (window.getComputedStyle(list).display === "none") return;
+    const links = list.querySelectorAll("a");
+    const actions = header.querySelector(".nav-actions");
+    if (!links.length || !actions) return;
+    const first = links[0].getBoundingClientRect(), last = links[links.length - 1].getBoundingClientRect();
+    const room = actions.getBoundingClientRect().left - 8;
+    if (Math.abs(last.top - first.top) > 2 || last.right > room || list.scrollWidth > list.clientWidth + 1) header.classList.add("nav-overflow");
+  }
+  let fitFrame = 0;
+  window.addEventListener("resize", function () {
+    if (fitFrame) return;
+    fitFrame = window.requestAnimationFrame(function () { fitFrame = 0; fitNav(); });
+  });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { fitNav(); });
+
+  /* Hosted pages carry a "report" link (we're the host, so abuse is ours to
+     act on) and a view beacon. The beacon sends no personal data: the
+     server counts uniques from a salted daily hash and keeps daily totals. */
+  let viewSent = false;
+  function hostedChrome() {
+    /* Every published portfolio is seen by exactly the audience most likely
+       to want one, so the way in has to be visible in the header rather than
+       only as a footer credit.
+
+       Deliberately NOT personalised: telling a signed-in owner "My sites"
+       instead of "Log in" would cost an API call on every public page view
+       (the refresh cookie is httpOnly, so the page cannot read it) to fix a
+       label for the one visitor who already knows the way. "Log in" lands a
+       signed-in owner in their workspace regardless. */
+    const actions = document.querySelector(".site-header .nav-actions");
+    if (actions && !actions.querySelector(".pf-cta")) {
+      const signup = el("a", { class: "btn btn-primary pf-cta", href: "/app.html#signup", text: "Build yours free" });
+      const login = el("a", { class: "btn btn-ghost pf-cta pf-cta-login", href: "/app.html#login", text: "Log in" });
+      actions.insertBefore(signup, actions.firstChild);
+      actions.insertBefore(login, signup);
+    }
+    // Mobile keeps the portfolio's own name and navigation usable; product
+    // links remain available inside the menu instead of overflowing it.
+    if (!refs.mobileList.querySelector(".pf-mobile-cta")) {
+      [["Log in", "/app.html#login"], ["Build yours free", "/app.html#signup"]].forEach(function (link) {
+        refs.mobileList.appendChild(el("li", { class: "pf-mobile-cta" }, el("a", { href: link[1], text: link[0] })));
+      });
+    }
+
+    const bottom = refs.footer.querySelector(".footer-bottom");
+    if (bottom && !bottom.querySelector(".report-link")) {
+      bottom.appendChild(el("a", { class: "report-link", href: "/#faq", text: "Report this page",
+        onclick: function (e) {
+          e.preventDefault();
+          reportPage();
+        } }));
+      bottom.appendChild(el("a", { class: "pf-made", href: "/", text: "Built with portfolio.dev — make yours free" }));
+    }
+    if (viewSent) return;
+    viewSent = true;
+    trackEvents();
+    try {
+      const payload = JSON.stringify({ referrer: document.referrer || "" });
+      const url = "/api/public/sites/" + encodeURIComponent(HOSTED_SLUG) + "/view";
+      if (!(navigator.sendBeacon && navigator.sendBeacon(url, new Blob([payload], { type: "application/json" })))) {
+        fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: payload, keepalive: true }).catch(function () {});
+      }
+    } catch (e) { /* analytics must never break the page */ }
+  }
+
+  /* Click and section counters for the owner's dashboard. Batched, sent
+     with sendBeacon, and skipped entirely when the browser asks not to be
+     tracked. The payload is a kind plus a section id or a link's host —
+     never a full URL, a cookie or an identifier. */
+  const SOCIAL = /(^|\.)(linkedin|github|gitlab|twitter|x|instagram|dribbble|behance|youtube|medium|mastodon|bsky|threads|facebook|tiktok|kaggle|scholar\.google|orcid|researchgate)\./i;
+  let queue = [], flushTimer = null;
+  function track(kind, target) {
+    queue.push({ kind: kind, target: target || "" });
+    if (!flushTimer) flushTimer = window.setTimeout(flush, 2000);
+  }
+  function flush() {
+    window.clearTimeout(flushTimer); flushTimer = null;
+    if (!queue.length) return;
+    const body = JSON.stringify({ events: queue.splice(0, 20) });
+    const url = "/api/public/sites/" + encodeURIComponent(HOSTED_SLUG) + "/event";
+    try {
+      if (!(navigator.sendBeacon && navigator.sendBeacon(url, new Blob([body], { type: "application/json" }))))
+        fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: body, keepalive: true }).catch(function () {});
+    } catch (e) { /* analytics must never break the page */ }
+  }
+  function trackEvents() {
+    if (navigator.globalPrivacyControl === true || navigator.doNotTrack === "1" || window.doNotTrack === "1") return;
+    document.addEventListener("click", function (e) {
+      const a = e.target && e.target.closest && e.target.closest("a[href]");
+      if (!a) return;
+      const href = a.getAttribute("href") || "";
+      const resume = DATA && DATA.profile && DATA.profile.resumeUrl;
+      if (/^mailto:/i.test(href)) track("click_email");
+      else if (/^tel:/i.test(href)) track("click_phone");
+      else if ((resume && href === resume) || /\.pdf($|\?)/i.test(href)) track("click_resume");
+      else if (/^https?:\/\//i.test(href) && !PF.util.sameOrigin(href)) {
+        let host = "";
+        try { host = new URL(href).hostname.replace(/^www\./, ""); } catch (_) { return; }
+        track(SOCIAL.test(host + ".") ? "click_social" : "click_link", host);
+      }
+    }, true);
+    window.addEventListener("beforeprint", function () { track("download_pdf"); flush(); });
+    window.addEventListener("pagehide", flush);
+    if ("IntersectionObserver" in window) {
+      const seen = {};
+      const io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (en) {
+          if (!en.isIntersecting || seen[en.target.id]) return;
+          seen[en.target.id] = true; io.unobserve(en.target);
+          track("section_view", en.target.id);
+        });
+      }, { threshold: 0.35 });
+      Array.prototype.forEach.call(document.querySelectorAll("main section[id]"), function (sec) { io.observe(sec); });
+    }
+  }
+
+  function reportPage() {
+    const reason = window.prompt("Why are you reporting this page? Type one of: impersonation, phishing, spam, illegal, copyright, harassment, other");
+    if (!reason) return;
+    const details = window.prompt("Anything else we should know? (optional)") || "";
+    fetch("/api/public/sites/" + encodeURIComponent(HOSTED_SLUG) + "/report", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reason: String(reason).trim().toLowerCase(), details: details })
+    }).then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { showToast(r.ok ? (j.message || "Thanks, we'll review it.") : (j.error || "Couldn't send the report."), !r.ok, 6000); }); })
+      .catch(function () { showToast("Couldn't send the report right now.", true, 6000); });
   }
 
   function showError(err) {
@@ -224,15 +407,17 @@
       el("div", { class: "container" },
         el("div", { class: "error-panel", role: "alert" },
           el("p", { class: "eyebrow", text: "Content unavailable" }),
-          el("h2", { id: "err-title", text: "Couldn't load data.json" }),
-          el("p", { text: "The page loaded, but the content file behind it didn't. Everything below is generated from that file." }),
+          el("h2", { id: "err-title", text: HOSTED ? "This portfolio isn't available right now" : "Couldn't load data.json" }),
+          el("p", { text: HOSTED
+            ? "It may have been unpublished by its owner, or the service is having trouble. Try again in a moment."
+            : "The page loaded, but the content file behind it didn't. Everything below is generated from that file." }),
           el("p", { class: "error-detail", text: String((err && err.message) || err) }),
-          isFile
+          HOSTED ? null : isFile
             ? el("p", null, "You opened this file directly from disk, and browsers block ",
                 el("code", { text: "fetch()" }), " on ", el("code", { text: "file://" }),
                 " URLs. Serve the folder over HTTP instead — for example ",
                 el("code", { text: "python3 -m http.server" }), " — or view it on GitHub Pages.")
-            : el("p", null, "Check that ", el("code", { text: "data.json" }), " sits next to this page and contains valid JSON."),
+            : (HOSTED ? null : el("p", null, "Check that ", el("code", { text: "data.json" }), " sits next to this page and contains valid JSON.")),
           el("div", { class: "hero-cta", style: "margin-top:1.5rem" },
             el("button", { class: "btn btn-primary", type: "button", onclick: load }, "Try again"))))));
   }
@@ -242,36 +427,50 @@
     refs.main.setAttribute("aria-busy", "true");
     fetch(DATA_URL, { cache: "no-store" })
       .then(function (res) {
-        if (!res.ok) throw new Error("HTTP " + res.status + " " + (res.statusText || "") + " while fetching " + DATA_URL);
+        if (!res.ok) throw new Error(HOSTED && res.status === 404 ? "No published portfolio at this address." : "HTTP " + res.status + " " + (res.statusText || "") + " while fetching " + DATA_URL);
         return res.text();
       })
       .then(function (body) {
         let data;
         try { data = JSON.parse(body); }
-        catch (e) { throw new Error("data.json is not valid JSON — " + e.message); }
+        catch (e) { throw new Error((HOSTED ? "The content" : "data.json") + " is not valid JSON — " + e.message); }
         draw(data);
+        /* Signed preview links (/preview/…) can ask for the resume view and
+           a watermark the same way the builder's frame does, via meta tags. */
+        const meta = function (n) { const m = document.querySelector('meta[name="' + n + '"]'); return m ? m.content : ""; };
+        if (meta("pf-view") === "resume") setResumePreview(true, meta("pf-resume-template") || (data.pdf && data.pdf.template), meta("pf-paper") || (data.pdf && data.pdf.paper));
+        if (meta("pf-watermark")) setWatermark(meta("pf-watermark"));
       })
       .catch(showError);
   }
 
   /* ------------------------------------------------------------------
-     6. Preview bridge (admin.html's Preview tab)
+     6. Preview bridge (the builder's Preview tab)
      ------------------------------------------------------------------ */
   function onPreviewMessage(event) {
-    if (event.source !== window.parent) return;
+    if (event.source !== PREVIEW_HOST) return;
     const msg = event.data;
     if (!msg) return;
+
+    /* Compare mode keeps two frames at the same place in the page. */
+    if (msg.type === "portfolio:scroll") {
+      const max = document.documentElement.scrollHeight - window.innerHeight;
+      syncing = true; window.scrollTo(0, Math.max(0, max) * (Number(msg.ratio) || 0));
+      window.setTimeout(function () { syncing = false; }, 60);
+      return;
+    }
 
     if (msg.type === "portfolio:data") {
       try {
         draw(msg.data);
         if (msg.mode === "light" || msg.mode === "dark") setMode(msg.mode);
         setResumePreview(msg.view === "resume", msg.template, msg.paper);
+        setWatermark(msg.watermark);
       } catch (e) { showError(e); }
       return;
     }
 
-    /* The admin drives PDF export through here so the print CSS only has
+    /* The builder drives PDF export through here so the print CSS only has
        to exist in one document. */
     if (msg.type === "portfolio:print") {
       try {
@@ -279,6 +478,17 @@
         window.setTimeout(function () { window.print(); }, 80);
       } catch (e) { /* nothing sensible to do in a preview frame */ }
     }
+  }
+
+  /* A support agent previewing a customer's site gets a watermark over it,
+     so a screenshot of a borrowed account is never mistaken for the real
+     page. Driven by the parent frame; absent for everyone else. */
+  function setWatermark(label) {
+    const existing = document.getElementById("pf-watermark");
+    if (!label) { if (existing) existing.remove(); return; }
+    const node = existing || el("div", { id: "pf-watermark", "aria-hidden": "true" });
+    node.setAttribute("data-label", String(label).slice(0, 40));
+    if (!existing) document.body.appendChild(node);
   }
 
   /* ------------------------------------------------------------------
@@ -354,9 +564,18 @@
      ------------------------------------------------------------------ */
   applyTheme();   // so the loading skeleton is already themed
 
+  let syncing = false, scrollTimer = null;
   if (PREVIEW) {
     window.addEventListener("message", onPreviewMessage);
-    window.parent.postMessage({ type: "portfolio:preview-ready" }, "*");
+    window.addEventListener("scroll", function () {
+      if (syncing || scrollTimer) return;
+      scrollTimer = window.setTimeout(function () {
+        scrollTimer = null;
+        const max = document.documentElement.scrollHeight - window.innerHeight;
+        PREVIEW_HOST.postMessage({ type: "portfolio:scrolled", ratio: max > 0 ? window.scrollY / max : 0 }, "*");
+      }, 50);
+    }, { passive: true });
+    PREVIEW_HOST.postMessage({ type: "portfolio:preview-ready" }, "*");
     if (loadStatus) loadStatus.textContent = "Waiting for preview data…";
   } else {
     load();

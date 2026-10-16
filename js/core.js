@@ -2,7 +2,7 @@
    core.js — the shared foundation. Load this first.
 
    Everything hangs off one global, PF. Each module calls PF.provide(name, api)
-   to register itself, so index.html and admin.html can check at boot that every
+   to register itself, so index.html and app.html can check at boot that every
    file actually arrived and name the missing one — instead of silently
    half-working, which is what happened when themes.js wasn't pushed.
 
@@ -21,9 +21,11 @@
   PF.provide = PF.provide || function (name, api) { PF[name] = api; PF.modules[name] = true; };
   PF.need = function (names) { return names.filter(function (n) { return !PF.modules[n]; }); };
   PF.FILE_OF = {
-    core: "js/core.js", icons: "js/icons.js", themes: "js/themes.js",
+    core: "js/core.js", icons: "js/icons.js", themes: "js/themes.js", skeletons: "js/skeletons.js",
     layouts: "js/layouts.js", resume: "js/resume.js", render: "js/render.js",
-    site: "js/site.js", admin: "js/admin.js"
+    site: "js/site.js", app: "js/app.js", packs: "js/packs.js", editor: "js/editor.js",
+    api: "js/api.js", auth: "js/auth.js", billing: "js/billing.js", ats: "js/ats.js", publish: "js/publish.js",
+    looks: "js/looks.js", insights: "js/insights.js", wizard: "js/wizard.js", ai: "js/ai.js", analytics: "js/analytics.js", preview: "js/preview.js"
   };
 
   /* ====================================================================
@@ -176,7 +178,7 @@
     return { months: TOTAL_MONTHS, years: TOTAL_YEARS, since: earliest };
   }
 
-  /* Plain-English account of where the number came from — the admin shows
+  /* Plain-English account of where the number came from — the builder shows
      this under the field so it's never a mystery. */
   function explainTotals(experience, profile) {
     const p = profile || {};
@@ -286,5 +288,62 @@
   }
 
   PF.provide("util", { download: download, sameOrigin: sameOrigin, fileNameFrom: fileNameFrom });
+
+  /* ====================================================================
+     MONEY
+
+     One formatter, because there were four: layouts.js hardcoded "$" and
+     never read the currency at all, billing.js keyed its symbol table on
+     lowercase codes, marketing.js keyed an almost-identical table on
+     UPPERCASE ones (so the same 'usd' took the symbol branch in one and the
+     fallback branch in the other), and console.js pinned Intl to en-US. The
+     same plan could render four ways on four screens.
+
+     It takes a CURRENCY ROW, not a code: the symbol, the number of decimal
+     places and which side the symbol goes on are data from the currencies
+     table, served alongside the prices. That is what makes ¥900 render as
+     ¥900 rather than ¥9.00 — "/100" is not a currency-agnostic conversion,
+     it is an assumption about the dollar. Identical logic lives in
+     service/src/lib/pricing.js's formatWith for receipt emails.
+
+     currencies is the map from the API payload: { usd: {symbol, minor_units,
+     symbol_position}, ... }. Unknown code, or no map yet: fall back to a
+     plain two-decimal number with the code after it — visibly unstyled
+     rather than confidently wrong.
+
+     `compact` drops a fractional part that is all zeros, so a headline plan
+     price reads "$9" and not "$9.00". That is a presentation choice about
+     ONE place — the big number on a pricing card — and it is a parameter
+     rather than a second function because the alternative is what this
+     module replaced: two implementations that also disagreed about the
+     symbol. Amounts that are charged, receipted or reconciled (payment
+     history, receipt emails, the console) always pass it as false, because
+     "$9" on an invoice next to "$9.00" on a statement is a support ticket.
+     ==================================================================== */
+  /* Spelled out rather than typed: an invisible U+00A0 in a string literal is
+     a trap, and the same constant has to exist in js/console.js and
+     service/src/lib/pricing.js for the three copies to agree. */
+  const NBSP = "\u00a0";
+
+  function moneyFrom(currencies, amountMinor, code, compact) {
+    if (amountMinor === null || amountMinor === undefined || amountMinor === "") return "—";
+    const n = Number(amountMinor);
+    if (!isFinite(n)) return "—";
+    const cur = currencies && code ? currencies[String(code).toLowerCase()] : null;
+    const units = cur ? Number(cur.minor_units) : 2;
+    const frac = compact && units > 0 && n % Math.pow(10, units) === 0 ? 0 : units;
+    const body = (n / Math.pow(10, units)).toLocaleString(undefined, { minimumFractionDigits: frac, maximumFractionDigits: frac });
+    if (!cur) return body + (code ? " " + String(code).toUpperCase() : "");
+    return cur.symbol_position === "after" ? body + NBSP + cur.symbol : cur.symbol + body;
+  }
+
+  /* Curried for the common case: a page holds one currency map and formats
+     many amounts against it. PF.money(payload.currencies) → fn(minor, code) */
+  function money(currencies) {
+    return function (amountMinor, code, compact) { return moneyFrom(currencies, amountMinor, code, compact); };
+  }
+  money.from = moneyFrom;
+
+  PF.provide("money", money);
   PF.modules.core = true;
 })();

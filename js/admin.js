@@ -11,7 +11,7 @@
   "use strict";
 
   const PF = window.PF;
-  const REQUIRED = ["core", "icons", "themes", "layouts", "resume"];
+  const REQUIRED = ["core", "icons", "themes", "skeletons", "packs", "looks", "layouts", "resume", "editor"];
 
   function bootFailure(missing) {
     const host = document.getElementById("connect-view") || document.body;
@@ -41,6 +41,9 @@
   let savedSnapshot = "";
   let activeTab = "profile";
   let previewReady = false;
+  let themePreviewReady = false;
+  let themePreviewDevice = "desktop";
+  let themeThumbObserver = null;
   let previewView = "site";
   let editMode = "dark";
   let applyThemeHere = false;
@@ -56,21 +59,26 @@
     const p = d.pdf && typeof d.pdf === "object" ? d.pdf : {};
     const obj = function (v) { return v && typeof v === "object" && !Array.isArray(v) ? v : {}; };
     const list = function (v) { return Array.isArray(v) ? v : []; };
-    /* Key order here becomes the key order in the committed file. */
-    return {
-      theme: {
-        preset: typeof t.preset === "string" && t.preset ? t.preset : "graphite",
+    /* Maintenance saves retain both current settings and future extensions. */
+    const out = Object.assign({}, d, {
+      theme: Object.assign({}, t, {
+        preset: typeof t.preset === "string" && t.preset ? t.preset : "minimal-light",
         mode: t.mode === "light" ? "light" : "dark",
+        variation: ["standard", "framed", "open", "poster"].indexOf(t.variation) !== -1 ? t.variation : "standard",
         iconAnimation: typeof t.iconAnimation === "string" ? t.iconAnimation : "lift",
         fonts: obj(t.fonts),
         vars: { common: obj(tv.common), dark: obj(tv.dark), light: obj(tv.light) },
-        templates: list(t.templates)
-      },
-      pdf: {
+        customThemes: list(t.customThemes).length ? list(t.customThemes) : list(t.templates)
+      }),
+      template: Object.assign({ skeleton: "clean-recruiter", pack: null, look: "" }, obj(d.template)),
+      pdf: Object.assign({}, p, {
         template: typeof p.template === "string" && p.template ? p.template : "compact",
         paper: p.paper === "letter" ? "letter" : "a4",
-        exclude: list(p.exclude)
-      },
+        exclude: list(p.exclude),
+        pages: p.pages === "1" || p.pages === "2" ? p.pages : "auto",
+        includeVisual: p.includeVisual === true
+      }),
+      sectionLabels: obj(d.sectionLabels),
       sectionOrder: list(d.sectionOrder),
       hiddenSections: list(d.hiddenSections),
       sections: list(d.sections),
@@ -80,7 +88,23 @@
       skills: list(d.skills),
       certifications: list(d.certifications),
       education: list(d.education)
-    };
+    });
+    delete out.theme.templates;
+    if (!out.profile.resumeMode && out.profile.resumeDownload && ["off", "file", "generated"].indexOf(out.profile.resumeDownload.mode) !== -1) {
+      out.profile.resumeMode = out.profile.resumeDownload.mode;
+      delete out.profile.resumeDownload;
+    }
+    [["experience", "exp"], ["projects", "proj"]].forEach(function (pair) {
+      const used = {};
+      out[pair[0]].forEach(function (it) { if (it && it.id) used[it.id] = true; });
+      let n = 1;
+      out[pair[0]].forEach(function (it) {
+        if (!it || it.id) return;
+        while (used[pair[1] + "-" + n]) n++;
+        it.id = pair[1] + "-" + n; used[it.id] = true;
+      });
+    });
+    return out;
   }
 
   const serialise = function () { return JSON.stringify(data, null, 2) + "\n"; };
@@ -97,138 +121,14 @@
   /* ====================================================================
      SCHEMA
      ==================================================================== */
-  const LINK_FIELDS = [
-    { key: "label", label: "Label" },
-    { key: "url", label: "URL" },
-    { key: "icon", label: "Logo", type: "icon" }
-  ];
-
-  const ITEM_FIELDS = [
-    { key: "title", label: "Title" },
-    { key: "value", label: "Big value", hint: "Stats layout only — e.g. 200K+" },
-    { key: "subtitle", label: "Subtitle" },
-    { key: "meta", label: "Meta", hint: "Date or right-aligned label" },
-    { key: "body", label: "Body", type: "textarea", hint: "**text** renders bold" },
-    { key: "bullets", label: "Bullets", type: "lines", hint: "One per line" },
-    { key: "tags", label: "Tags", type: "tags" },
-    { key: "image", label: "Image", type: "image" },
-    { key: "links", label: "Links", type: "objectList", itemLabel: "link", fields: LINK_FIELDS }
-  ];
-
-  const SCHEMA = [
-    {
-      key: "profile", label: "Profile", kind: "object",
-      doc: "Feeds the hero, the about copy, the contact footer, the page title, the meta/Open Graph tags and the schema.org block.",
-      fields: [
-        { key: "name", label: "Full name", required: true },
-        { key: "shortName", label: "Short name", hint: "Nav brand and page title" },
-        { key: "title", label: "Job title" },
-        { key: "yearsRounding", label: "Experience — how to round it", type: "select",
-          optionsFrom: "roundings",
-          hint: function () { return PF.fmt.explainTotals(data.experience, data.profile); } },
-        { key: "experienceYears", label: "Experience — type it in yourself", placeholder: "auto",
-          hint: "Leave empty and it's counted from your earliest start date, so it never goes stale. "
-              + "Fill it in to override that: just the number — 4.5, ~4.5, 5 — since the copy writes the “+” itself. "
-              + "Once set, it stays at whatever you typed." },
-        { key: "tagline", label: "Tagline", type: "textarea",
-          hint: "{{years}} becomes the number above · {{months}} becomes the month count" },
-        { key: "status", label: "Hero pill", hint: "Blank hides the pill" },
-        { key: "location", label: "Location", hint: "City, Country" },
-        { key: "email", label: "Email", check: "email" },
-        { key: "phone", label: "Phone" },
-        { key: "resumeUrl", label: "Resume URL", hint: "The hosted PDF the site links to" },
-        { key: "siteUrl", label: "Site URL", hint: "Canonical + Open Graph" },
-        { key: "ogImage", label: "Share image", type: "image",
-          upload: { maxDim: 1200, mime: "image/jpeg" },
-          hint: "Shown when the link is pasted into LinkedIn, Slack or X. 1200×630 works best. Leave it empty rather than naming a file that isn't committed — a missing one shows as a broken preview." },
-        { key: "photo", label: "Profile photo", type: "image" },
-        { key: "about", label: "About paragraphs", type: "lines", hint: "One paragraph per line" },
-        { key: "links", label: "Links", type: "objectList", itemLabel: "link", fields: LINK_FIELDS }
-      ]
-    },
-    {
-      key: "experience", label: "Experience", kind: "list", itemLabel: "role", idPrefix: "exp",
-      doc: "The site sorts these by start date, newest first — the order here only matters for ties.",
-      title: function (it) { return [it.role, it.company].filter(Boolean).join(" · ") || "New role"; },
-      fields: [
-        { key: "id", label: "ID", required: true, unique: true, mono: true, hint: "Stable identifier — must be unique" },
-        { key: "company", label: "Company", required: true },
-        { key: "role", label: "Role", required: true },
-        { key: "startDate", label: "Start", type: "month", required: true, hint: "YYYY-MM" },
-        { key: "endDate", label: "End", type: "month", nullWhenEmpty: true, hint: "Blank = Present" },
-        { key: "location", label: "Location" },
-        { key: "summary", label: "Summary", type: "textarea" },
-        { key: "highlights", label: "Highlights", type: "lines", hint: "One bullet per line · **text** renders bold" },
-        { key: "tech", label: "Tech", type: "tags" }
-      ]
-    },
-    {
-      key: "projects", label: "Projects", kind: "list", itemLabel: "project", idPrefix: "proj",
-      doc: "Featured projects render first and double-width. The filter buttons on the site are the union of every tech tag.",
-      title: function (it) { return it.title || "New project"; },
-      fields: [
-        { key: "id", label: "ID", required: true, unique: true, mono: true },
-        { key: "title", label: "Title", required: true },
-        { key: "featured", label: "Featured", type: "bool" },
-        { key: "image", label: "Cover image", type: "image" },
-        { key: "blurb", label: "Blurb", type: "textarea" },
-        { key: "problem", label: "Problem", type: "textarea" },
-        { key: "approach", label: "Approach", type: "textarea" },
-        { key: "result", label: "Result", type: "textarea" },
-        { key: "tech", label: "Tech", type: "tags" },
-        { key: "links", label: "Links", type: "objectList", itemLabel: "link", fields: LINK_FIELDS }
-      ]
-    },
-    {
-      key: "skills", label: "Skills", kind: "list", itemLabel: "category",
-      doc: "One card per category, in this order. Nothing about the categories is hardcoded on the site.",
-      title: function (it) { return it.category || "New category"; },
-      fields: [
-        { key: "category", label: "Category", required: true },
-        { key: "icon", label: "Icon", type: "icon" },
-        { key: "items", label: "Items", type: "tags" }
-      ]
-    },
-    {
-      key: "certifications", label: "Certifications", kind: "list", itemLabel: "certification",
-      doc: "Empty this list and the section plus its nav link disappear from the site.",
-      title: function (it) { return it.name || "New certification"; },
-      fields: [
-        { key: "name", label: "Name", required: true },
-        { key: "abbr", label: "Short code", hint: "e.g. CSA" },
-        { key: "issuer", label: "Issuer" },
-        { key: "year", label: "Year", type: "year" },
-        { key: "credentialUrl", label: "Credential URL", hint: "Adds a Verify link" },
-        { key: "icon", label: "Badge icon", type: "icon" }
-      ]
-    },
-    {
-      key: "education", label: "Education", kind: "list", itemLabel: "qualification",
-      doc: "Sorted by start year, newest first.",
-      title: function (it) { return it.degree || it.institution || "New qualification"; },
-      fields: [
-        { key: "degree", label: "Degree", required: true },
-        { key: "institution", label: "Institution", required: true },
-        { key: "startYear", label: "Start year", type: "year", hint: "YYYY" },
-        { key: "endYear", label: "End year", type: "year", nullWhenEmpty: true, hint: "Blank = Present" },
-        { key: "detail", label: "Detail", hint: "e.g. CGPA 9.47 / 10" }
-      ]
-    }
-  ];
-
-  const CUSTOM_SECTION_FIELDS = [
-    { key: "id", label: "Anchor id", mono: true, hint: "Used in the URL as #id — blank derives it from the title" },
-    { key: "title", label: "Title", required: true },
-    { key: "eyebrow", label: "Eyebrow", hint: "Small label above the title" },
-    { key: "blurb", label: "Intro", type: "textarea" },
-    { key: "layout", label: "Layout", type: "select", optionsFrom: "layouts" },
-    { key: "altBackground", label: "Alternate background", type: "bool" },
-    { key: "items", label: "Items", type: "objectList", itemLabel: "item", fields: ITEM_FIELDS }
-  ];
+  const contentFields = PF.editor.create(function () { return data; });
+  const LINK_FIELDS = contentFields.LINK_FIELDS, ITEM_FIELDS = contentFields.ITEM_FIELDS;
+  const SCHEMA = contentFields.SCHEMA, CUSTOM_SECTION_FIELDS = contentFields.CUSTOM_SECTION_FIELDS;
 
   const TABS = SCHEMA.concat([
+    { key: "links", label: "Links", kind: "links" },
     { key: "sections", label: "Sections", kind: "sections" },
-    { key: "theme", label: "Theme", kind: "theme" },
+    { key: "theme", label: "Design", kind: "theme" },
     { key: "resume", label: "Resume", kind: "resume" },
     { key: "preview", label: "Preview", kind: "preview" }
   ]);
@@ -388,6 +288,28 @@
     });
   }
 
+  function uploadResume(file, status) {
+    if (!TOKEN) return Promise.reject(new Error("Connect to the repository first."));
+    if (!file || !/\.(pdf|docx)$/i.test(file.name || "")) {
+      return Promise.reject(new Error("Choose a PDF or Word (.docx) file."));
+    }
+    if (file.size > 2.5 * 1024 * 1024) return Promise.reject(new Error("Resume files can be up to 2.5 MB. Export a smaller copy and try again."));
+    const ext = file.name.split(".").pop().toLowerCase();
+    const path = ASSET_DIR + "/" + safeName(file.name, ext);
+    status("Uploading " + path + " (" + Math.max(1, Math.round(file.size / 1024)) + " KB)…", "");
+    return file.arrayBuffer()
+      .then(function (buf) { return PF.b64.bytes(new Uint8Array(buf)); })
+      .then(function (b64) {
+        return shaOf(path).then(function (existing) {
+          return putFile(path, (existing ? "Replace " : "Upload ") + path, b64, existing);
+        });
+      })
+      .then(function (res) {
+        if (!res.ok) throw new Error(describeHttpError(res.status, res.json));
+        return path;
+      });
+  }
+
   /* ====================================================================
      FIELD CONTROLS
      ==================================================================== */
@@ -512,6 +434,62 @@
         + " and re-encoded to " + (FORMAT_OF[up.mime] || "WebP")
         + ", then committed to " + ASSET_DIR + "/ as their own commit." }),
       has(f.hint) && el("span", { class: "hint", text: f.hint }));
+  }
+
+  function resumeField(obj, f) {
+    const wrap = el("div", { class: "field resume-field", id: "resume-field" });
+    const mode = function () { return obj.resumeMode || (obj.resumeDownload && obj.resumeDownload.mode) || (has(obj.resumeUrl) ? "file" : "off"); };
+    function setMode(value) { obj.resumeMode = value; delete obj.resumeDownload; touched(); draw(); }
+    function draw() {
+      clear(wrap);
+      const status = el("p", { class: "img-status", role: "status", "aria-live": "polite" });
+      const say = function (text, kind) { status.textContent = text || ""; status.className = "img-status" + (kind ? " " + kind : ""); };
+      wrap.appendChild(el("p", { class: "sub-label", text: f.label }));
+      wrap.appendChild(el("p", { class: "hint", text: "Choose whether visitors see a Download Resume button. Upload a file, then Save to GitHub to update the live site." }));
+      const modes = [["off", "No button"], ["file", "My own resume file"]];
+      if (mode() === "generated") modes.push(["generated", "Built from my portfolio (published PDF)"]);
+      wrap.appendChild(el("div", { class: "resume-modes", role: "radiogroup", "aria-label": "Resume download button" }, modes.map(function (choice) {
+        const id = uid(), input = el("input", { type: "radio", name: "resume-mode", id: id, value: choice[0] });
+        input.checked = mode() === choice[0];
+        input.addEventListener("change", function () { if (input.checked) setMode(choice[0]); });
+        return el("div", { class: "resume-mode" + (input.checked ? " is-on" : "") }, input, el("label", { for: id, text: choice[1] }));
+      })));
+      if (mode() === "off") return;
+      if (mode() === "generated") {
+        wrap.appendChild(el("p", { class: "notice info", text: "Your last published PDF remains available. GitHub Pages cannot rebuild it automatically. To refresh it after editing, save a PDF from the Resume tab and upload it here." }));
+        wrap.appendChild(el("button", { type: "button", class: "btn btn-ghost btn-sm", text: "Open resume layout and export", onclick: function () { selectTab("resume"); } }));
+      }
+      const fileInput = el("input", { type: "file", id: uid(), accept: ".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document", class: "visually-hidden" });
+      const have = has(obj.resumeUrl);
+      wrap.appendChild(el("p", { class: "img-path", id: "resume-file-name", text: have ? obj.resumeName || obj.resumeUrl : "No file attached yet" }));
+      fileInput.addEventListener("change", function () {
+        const file = fileInput.files && fileInput.files[0];
+        if (!file) return;
+        uploadResume(file, say).then(function (filePath) {
+          obj.resumeUrl = filePath; obj.resumeName = file.name; obj.resumeMode = "file"; delete obj.resumeDownload;
+          touched(); draw();
+          wrap.appendChild(el("p", { class: "img-status ok", role: "status", text: "Uploaded " + file.name + ". Press Save to GitHub to connect it to the live site." }));
+        }).catch(function (err) { say(String(err.message || err), "err"); })
+          .then(function () { fileInput.value = ""; });
+      });
+      wrap.appendChild(el("div", { class: "img-buttons" },
+        el("label", { class: "btn btn-ghost btn-sm", for: fileInput.id }, have ? "Replace file…" : "Choose a PDF or Word file…"), fileInput,
+        have ? el("a", { class: "btn btn-ghost btn-sm", href: obj.resumeUrl, target: "_blank", rel: "noopener noreferrer", text: "Open current ↗" }) : null,
+        have ? el("button", { class: "btn btn-ghost btn-sm", type: "button", text: "Remove", onclick: function () {
+          obj.resumeUrl = ""; obj.resumeName = ""; obj.resumeMode = "off"; delete obj.resumeDownload; touched(); draw();
+          wrap.appendChild(el("p", { class: "hint", text: "Save to remove the button. The uploaded file stays in your repository." }));
+        } }) : null));
+      wrap.appendChild(status);
+      const urlId = uid(), link = el("input", { type: "text", id: urlId, value: obj.resumeUrl || "", placeholder: "https://example.com/resume.pdf" });
+      link.addEventListener("input", function () {
+        obj.resumeUrl = link.value.trim(); obj.resumeName = ""; obj.resumeMode = "file"; delete obj.resumeDownload; touched();
+      });
+      wrap.appendChild(el("details", { class: "more-options" }, el("summary", { text: "Or link to a file you already host" }),
+        el("label", { for: urlId, text: "Resume file address" }), link));
+      wrap.appendChild(el("p", { class: "hint", text: "PDF or Word (.docx), up to 2.5 MB." }));
+    }
+    draw();
+    return wrap;
   }
 
   /* ── Logo / icon picker: brand mark, Lucide name, URL, upload,
@@ -679,7 +657,7 @@
   function selectField(obj, f) {
     const id = uid();
     const opts = f.optionsFrom === "layouts"
-      ? PF.layouts.LIST.map(function (l) { return { value: l.id, label: l.name + " — " + l.blurb }; })
+      ? PF.layouts.customer().map(function (l) { return { value: l.id, label: l.name + " — " + l.blurb }; })
       : f.optionsFrom === "roundings"
       ? PF.fmt.ROUNDINGS.map(function (r) { return { value: r.id, label: r.name + " (e.g. " + r.example + ") — " + r.blurb }; })
       : (f.options || []).map(function (o) { return typeof o === "string" ? { value: o, label: o } : o; });
@@ -694,6 +672,7 @@
   function fieldRow(obj, f, onTitleChange) {
     if (f.type === "tags") return tagInput(obj, f);
     if (f.type === "image") return imageField(obj, f);
+    if (f.type === "resume") return resumeField(obj, f);
     if (f.type === "icon") return iconField(obj, f);
     if (f.type === "select") return selectField(obj, f);
 
@@ -721,7 +700,7 @@
       input = el("textarea", { id: id, rows: f.type === "lines" ? 5 : 3 });
       input.value = f.type === "lines" ? readValue(obj, f).join("\n") : readValue(obj, f);
     } else if (f.type === "month") {
-      input = el("input", { type: "month", id: id, placeholder: "2026-05" });
+      input = el("input", { type: "text", id: id, placeholder: "2021-03", inputmode: "numeric", autocomplete: "off" });
       input.value = readValue(obj, f);
     } else {
       input = el("input", { type: "text", id: id, placeholder: f.placeholder || null });
@@ -736,20 +715,28 @@
       input, hintNode(f, obj));
   }
 
-  const WIDE = { textarea: 1, lines: 1, tags: 1, objectList: 1, image: 1, select: 1, icon: 1 };
+  const WIDE = { textarea: 1, lines: 1, tags: 1, objectList: 1, image: 1, select: 1, icon: 1, resume: 1 };
   function fieldGroups(item, fields, retitle) {
-    const out = [];
-    let bucket = [];
-    const flush = function () {
-      if (!bucket.length) return;
-      out.push(el("div", { class: "field-grid cols-2" }, bucket));
-      bucket = [];
+    const layout = function (list) {
+      const out = [];
+      let bucket = [];
+      const flush = function () {
+        if (!bucket.length) return;
+        out.push(el("div", { class: "field-grid cols-2" }, bucket));
+        bucket = [];
+      };
+      list.forEach(function (f) {
+        if (WIDE[f.type]) { flush(); out.push(fieldRow(item, f, retitle)); }
+        else bucket.push(fieldRow(item, f, retitle));
+      });
+      flush();
+      return out;
     };
-    fields.forEach(function (f) {
-      if (WIDE[f.type]) { flush(); out.push(fieldRow(item, f, retitle)); }
-      else bucket.push(fieldRow(item, f, retitle));
-    });
-    flush();
+    const visible = fields.filter(function (f) { return !f.hidden; });
+    const basic = visible.filter(function (f) { return !f.advanced; });
+    const extra = visible.filter(function (f) { return f.advanced; });
+    const out = layout(basic);
+    if (extra.length) out.push(el("details", { class: "more-options" }, el("summary", { text: "More options" }), layout(extra)));
     return out;
   }
 
@@ -836,27 +823,41 @@
     function build(focusIndex) {
       const list = getList();
       clear(host);
-      if (!list.length) host.appendChild(el("p", { class: "empty", text: "No " + spec.itemLabel + "s yet." }));
+      if (!list.length) host.appendChild(el("p", { class: "empty", text: spec.empty || "Nothing here yet — add your first " + spec.itemLabel + "." }));
 
       list.forEach(function (item, i) {
         const titleEl = el("h3", { class: "item-title", text: spec.title ? spec.title(item) : spec.itemLabel + " " + (i + 1) });
-        const retitle = spec.title ? function () { titleEl.textContent = spec.title(item); } : null;
+        const subEl = spec.summary ? el("span", { class: "item-sub", text: spec.summary(item) || "" }) : null;
+        const retitle = spec.title ? function () { titleEl.textContent = spec.title(item); if (subEl) subEl.textContent = spec.summary(item) || ""; } : null;
         const card = el("article", { class: "item-card" + (spec.nested ? " nested" : ""), "data-index": i });
+        /* Top-level lists read as a tidy list of cards; one opens at a time
+           to edit, so the first thing you see is your content, not a form. */
+        const collapsible = !spec.nested;
+        const open = !collapsible || i === focusIndex;
+        if (collapsible) card.classList.toggle("is-collapsed", !open);
         const handle = toolBtn("⠿", "Drag to reorder " + (spec.title ? spec.title(item) : spec.itemLabel), false, null, "drag-handle");
         wireDrag(card, handle, host, state, reorderFromDom);
 
+        const body = el("div", { class: "item-body", hidden: !open }, fieldGroups(item, spec.fields, retitle));
+        const toggle = collapsible && el("button", { type: "button", class: "btn btn-ghost btn-sm item-edit", "aria-expanded": String(open), text: open ? "Done" : "Edit",
+          onclick: function () {
+            const nowOpen = body.hidden;
+            body.hidden = !nowOpen; card.classList.toggle("is-collapsed", !nowOpen);
+            this.textContent = nowOpen ? "Done" : "Edit"; this.setAttribute("aria-expanded", String(nowOpen));
+            if (nowOpen) { const first = body.querySelector("input, textarea"); if (first) first.focus(); }
+          } });
         card.appendChild(el("header", { class: "item-head" },
           handle,
-          el("span", { class: "item-idx", text: String(i + 1).padStart(2, "0") }),
-          titleEl,
+          el("div", { class: "item-heading" }, titleEl, subEl),
           el("div", { class: "item-tools" },
+            toggle,
             toolBtn("↑", "Move up", i === 0, function () { swap(list, i, i - 1); touched(); build(i - 1); }),
             toolBtn("↓", "Move down", i === list.length - 1, function () { swap(list, i, i + 1); touched(); build(i + 1); }),
             toolBtn("✕", "Delete", false, function () {
               if (!window.confirm("Delete this entry? Nothing is committed until you save.")) return;
               list.splice(i, 1); touched(); build();
             }, "danger"))));
-        card.appendChild(el("div", { class: "item-body" }, fieldGroups(item, spec.fields, retitle)));
+        card.appendChild(body);
         host.appendChild(card);
       });
 
@@ -907,7 +908,7 @@
 
   function orderedSections() {
     const known = knownSections();
-    const order = data.sectionOrder.map(String);
+    const order = (data.sectionOrder.length ? data.sectionOrder : PF.skeletons.byId(data.template.skeleton).order).map(String);
     return known.map(function (s, i) { return { s: s, i: i }; })
       .sort(function (a, b) {
         const ra = order.indexOf(a.s.id), rb = order.indexOf(b.s.id);
@@ -957,7 +958,22 @@
         wireDrag(row, handle, orderHost, state, readOrderFromDom);
         row.appendChild(handle);
         row.appendChild(el("span", { class: "item-idx", text: String(i + 1).padStart(2, "0") }));
-        row.appendChild(el("span", { class: "order-name", text: s.label }));
+        const name = el("input", { class: "order-name", value: data.sectionLabels[s.id] || s.label, "aria-label": "Rename " + s.label });
+        name.addEventListener("change", function () {
+          if (s.kind === "custom") {
+            const index = knownSections().filter(function (item) { return item.kind === "custom"; }).findIndex(function (item) { return item.id === s.id; });
+            if (index !== -1) {
+              const sec = data.sections[index];
+              if (!sec.id) sec.id = s.id;
+              sec.title = name.value.trim() || s.label;
+            }
+          } else {
+            if (name.value.trim()) data.sectionLabels[s.id] = name.value.trim();
+            else delete data.sectionLabels[s.id];
+          }
+          touched();
+        });
+        row.appendChild(name);
         row.appendChild(el("span", { class: "order-kind", text: s.kind }));
         row.appendChild(el("div", { class: "item-tools" },
           toolBtn("↑", "Move up", i === 0, function () { moveInOrder(s.id, -1); }),
@@ -966,7 +982,7 @@
             type: "button", class: "tool-btn", "aria-pressed": String(!hidden),
             title: hidden ? "Show on the site" : "Hide from the site",
             "aria-label": (hidden ? "Show " : "Hide ") + s.label,
-            text: hidden ? "○" : "●",
+            text: hidden ? "Hidden" : "Shown",
             onclick: function () {
               const at = data.hiddenSections.indexOf(s.id);
               if (at === -1) data.hiddenSections.push(s.id); else data.hiddenSections.splice(at, 1);
@@ -987,8 +1003,8 @@
     panel.appendChild(el("p", { class: "sub-head", text: "Custom sections" }));
     panel.appendChild(el("p", { class: "section-doc", text:
       "Anything the built-ins don't cover: talks, publications, awards, metrics, recommendations, a gallery. " +
-      "Pick one of the " + PF.layouts.LIST.length + " layouts and the site renders it — no markup to write." }));
-    panel.appendChild(el("div", { class: "layout-legend" }, PF.layouts.LIST.map(function (l) {
+      "Pick one of the " + PF.layouts.customer().length + " layouts and the site renders it — no markup to write." }));
+    panel.appendChild(el("div", { class: "layout-legend" }, PF.layouts.customer().map(function (l) {
       return el("span", { class: "legend-chip", title: l.blurb, text: l.name });
     })));
     panel.appendChild(listEditor(function () { return data.sections; }, {
@@ -1011,28 +1027,113 @@
     document.documentElement.setAttribute("data-theme", "dark");
   }
 
+  function fitThemeThumbnails(panel) {
+    if (themeThumbObserver) themeThumbObserver.disconnect();
+    const fit = function (host) {
+      const frame = host.querySelector("iframe"), scale = host.clientWidth / 1440;
+      if (!frame || !scale) return;
+      frame.style.height = Math.ceil(host.clientHeight / scale) + "px";
+      frame.style.transform = "scale(" + scale + ")";
+    };
+    const hosts = Array.from(panel.querySelectorAll(".theme-site-thumb"));
+    hosts.forEach(fit);
+    if (window.ResizeObserver) {
+      themeThumbObserver = new ResizeObserver(function (entries) { entries.forEach(function (entry) { fit(entry.target); }); });
+      hosts.forEach(function (host) { themeThumbObserver.observe(host); });
+    }
+  }
+
   function buildThemePanel(panel) {
     clear(panel);
-    panel.appendChild(el("div", { class: "panel-head" }, el("h2", { text: "Theme" })));
+    panel.appendChild(el("div", { class: "panel-head" }, el("h2", { text: "Design" })));
     panel.appendChild(el("p", { class: "section-doc", text:
-      "Pick a starting template, then tune anything. Every change is stored in data.json as a handful of CSS " +
-      "variables — the site reads them at load, so there's nothing to rebuild." }));
+      "Template controls the page structure and storytelling. Theme controls colours, typography, surfaces and atmosphere. Choose them independently; neither changes your content." }));
+
+    const deviceSwitch = el("div", { class: "mode-switch", role: "group", "aria-label": "Theme preview size" },
+      [["desktop", "Desktop"], ["mobile", "Mobile"]].map(function (d) {
+        return el("button", { type: "button", "aria-pressed": String(themePreviewDevice === d[0]), text: d[1],
+          onclick: function () { themePreviewDevice = d[0]; buildThemePanel(panel); } });
+      }));
+    const themeFrame = el("iframe", { class: "theme-live-frame", id: "theme-live-frame",
+      title: "Actual portfolio preview using the selected theme", src: "site.html?preview=1" });
+    panel.appendChild(el("div", { class: "theme-live-shell" },
+      el("div", { class: "preview-bar" },
+        el("strong", { text: "Your portfolio with this theme" }), deviceSwitch,
+        el("span", { class: "hint", id: "theme-preview-hint", text: "Loading the real site preview…" })),
+      el("div", { class: "theme-live-frame-wrap" + (themePreviewDevice === "mobile" ? " is-mobile" : "") }, themeFrame)));
+    themePreviewReady = false;
+
+    panel.appendChild(el("h3", { class: "sub-head", text: "1 · Page template" }));
+    panel.appendChild(el("p", { class: "section-doc", text: "Templates rearrange the hero, navigation and every section. These previews use your current content." }));
+    const lookGallery = el("div", { class: "theme-gallery" });
+    const currentLook = PF.looks.current(data);
+    const selectedLook = PF.looks.byId(currentLook);
+    (selectedLook && selectedLook.retired ? PF.looks.GALLERY.concat([selectedLook]) : PF.looks.GALLERY).forEach(function (look) {
+      lookGallery.appendChild(el("button", {
+        type: "button", class: "theme-card", "aria-pressed": String(currentLook === look.id),
+        onclick: function () { PF.looks.applyTemplate(data, look.id); touched(); buildThemePanel(panel); }
+      },
+        el("span", { class: "theme-site-thumb" },
+          el("iframe", { loading: "lazy", tabindex: "-1", "aria-hidden": "true", "data-look-preview": look.id, src: "site.html?preview=1", title: "" }),
+          el("span", { class: "theme-loading", text: "Rendering page structure…" })),
+        el("span", { class: "theme-body" },
+          el("strong", { text: look.name }),
+          el("span", { text: look.blurb }),
+          el("span", { class: "theme-fonts", text: look.retired ? "Previous template · still supported" : "Page structure" }),
+          currentLook === look.id ? el("span", { class: "theme-selected", text: "● selected" }) : null)));
+    });
+    panel.appendChild(lookGallery);
+
+    const chart = PF.skeletons.careerChart(data);
+    if (chart.supported) {
+      const id = uid(), box = el("input", { type: "checkbox", id: id });
+      box.checked = chart.on;
+      box.addEventListener("change", function () { data.template.careerChart = box.checked; touched(); buildThemePanel(panel); });
+      panel.appendChild(el("div", { class: "field-inline career-chart-toggle" }, box,
+        el("label", { for: id, text: "Show a career timeline chart (your roles over time) above your experience" })));
+      if (chart.on && !chart.dated) panel.appendChild(el("p", { class: "notice warn", text: "Add start dates under Experience so the timeline can show your roles." }));
+    }
+
+    panel.appendChild(el("h3", { class: "sub-head", text: "2 · Visual theme" }));
+    panel.appendChild(el("p", { class: "section-doc", text: "Themes keep the selected structure but change its complete visual language in both dark and light modes." }));
 
     const gallery = el("div", { class: "theme-gallery" });
+    function previewStyle(t) {
+      const r = TH.resolveTheme({ preset: t.id, fonts: {}, vars: { common: {}, dark: {}, light: {} }, customThemes: data.theme.customThemes });
+      const v = Object.assign({}, r.vars.common || {}, r.vars[editMode] || {});
+      const get = function (key, fallback) { return v[key] == null || v[key] === "" ? fallback : v[key]; };
+      return [
+        "--pm-accent:" + get("--accent", "#5cc8a8"),
+        "--pm-bg:" + get("--bg", "#11151b"),
+        "--pm-surface:" + get("--surface", "#18202a"),
+        "--pm-text:" + get("--text", "#eef2f7"),
+        "--pm-mid:" + get("--text-mid", "#b6c0cc"),
+        "--pm-dim:" + get("--text-dim", "#7f8b99"),
+        "--pm-border:" + get("--border", "#283341"),
+        "--pm-border-2:" + get("--border-2", "#3a4858"),
+        "--pm-radius:" + get("--radius-sm", "8px"),
+        "--pm-button-radius:" + get("--button-radius", get("--radius-sm", "8px")),
+        "--pm-card-border:" + get("--card-border-width", "1px"),
+        "--pm-shadow:" + get("--card-shadow", "none"),
+        "background:" + get("--bg", "#11151b")
+      ].join(";");
+    }
     function drawGallery() {
       clear(gallery);
-      data.theme.templates.concat(TH.THEMES).forEach(function (t) {
-        const v = (t.vars && t.vars[editMode]) || {};
-        const isCustom = data.theme.templates.indexOf(t) !== -1;
-        const selected = data.theme.preset === t.id;
+      const selectedId = resolvedTheme().id;
+      const selectedTheme = TH.themeById(selectedId, data.theme.customThemes);
+      const builtIns = selectedTheme && selectedTheme.retired ? TH.GALLERY.concat([selectedTheme]) : TH.GALLERY;
+      data.theme.customThemes.concat(builtIns).forEach(function (t) {
+        const isCustom = data.theme.customThemes.indexOf(t) !== -1;
+        const selected = selectedId === t.id;
         gallery.appendChild(el("button", {
           type: "button", class: "theme-card", "aria-pressed": String(selected),
           onclick: function () { choosePreset(t.id); }
         },
-          el("span", { class: "theme-mock", style: "background:" + (v["--bg"] || "#111") },
-            el("span", { class: "m-bar", style: "width:62%;background:" + (v["--text"] || "#eee") }),
-            el("span", { class: "m-bar", style: "width:40%;background:" + (v["--text-dim"] || "#888") }),
-            el("span", { class: "m-chip", style: "background:" + (v["--accent"] || "#5cc8a8") })),
+          el("span", { class: "theme-site-thumb", style: previewStyle(t) },
+            el("iframe", { loading: "lazy", tabindex: "-1", "aria-hidden": "true",
+              "data-theme-preview": t.id, src: "site.html?preview=1", title: "" }),
+            el("span", { class: "theme-loading", text: "Rendering real portfolio…" })),
           el("span", { class: "theme-body" },
             el("strong", { text: t.name + (isCustom ? " (yours)" : "") }),
             el("span", { text: t.blurb || "Custom template." }),
@@ -1042,25 +1143,36 @@
     }
 
     function choosePreset(id) {
-      const hasTweaks = ["common", "dark", "light"].some(function (k) { return Object.keys(data.theme.vars[k]).length; }) ||
-                        Object.keys(data.theme.fonts).length;
-      if (hasTweaks && !window.confirm("Switching template discards your colour, type and font tweaks. Continue?")) return;
+      const hasTweaks = ["common", "dark", "light"].some(function (k) { return Object.keys(data.theme.vars[k]).length; });
+      if (hasTweaks && !window.confirm("Switching theme discards your colour tweaks. Your chosen fonts and page treatment stay. Continue?")) return;
       data.theme.preset = id;
       data.theme.vars = { common: {}, dark: {}, light: {} };
-      data.theme.fonts = {};
       touched();
+      if (applyThemeHere) applyThemeToEditor();
       buildThemePanel(panel);
     }
 
     drawGallery();
     panel.appendChild(gallery);
 
+    panel.appendChild(el("h3", { class: "sub-head", text: "3 · Page treatment" }));
+    panel.appendChild(el("p", { class: "section-doc", text: "Mix any visual theme with a different composition. This changes framing, spacing and emphasis without changing your content or page template." }));
+    panel.appendChild(el("div", { class: "mode-switch", role: "group", "aria-label": "Page treatment" },
+      [["standard", "Standard"], ["framed", "Framed"], ["open", "Open"], ["poster", "Poster"]].map(function (v) {
+        return el("button", { type: "button", "aria-pressed": String((data.theme.variation || "standard") === v[0]), text: v[1],
+          onclick: function () { data.theme.variation = v[0]; touched(); buildThemePanel(panel); } });
+      })));
+
     /* mode + apply-here */
     const modeSwitch = el("div", { class: "mode-switch", role: "group", "aria-label": "Which mode you're editing" },
       ["dark", "light"].map(function (m) {
         return el("button", {
           type: "button", "aria-pressed": String(editMode === m), text: m === "dark" ? "Dark" : "Light",
-          onclick: function () { editMode = m; data.theme.mode = m; touched(); buildThemePanel(panel); }
+          onclick: function () {
+            editMode = m; data.theme.mode = m; touched();
+            if (applyThemeHere) applyThemeToEditor();
+            buildThemePanel(panel);
+          }
         });
       }));
 
@@ -1077,10 +1189,10 @@
         el("label", { for: "apply-here", text: "Preview theme in this editor" })),
       el("span", { style: "flex:1" }),
       el("button", { class: "btn btn-ghost btn-sm", type: "button", onclick: function () {
-        if (!window.confirm("Reset every tweak back to the " + TH.themeById(data.theme.preset, data.theme.templates).name + " template?")) return;
+        if (!window.confirm("Reset every tweak back to the " + TH.themeById(data.theme.preset, data.theme.customThemes).name + " theme?")) return;
         data.theme.vars = { common: {}, dark: {}, light: {} };
         data.theme.fonts = {};
-        touched(); buildThemePanel(panel);
+        touched(); if (applyThemeHere) applyThemeToEditor(); buildThemePanel(panel);
       } }, "Reset tweaks")));
 
     const resolved = resolvedTheme();
@@ -1205,25 +1317,25 @@
 
     /* save as template */
     const nameId = uid();
-    const nameInput = el("input", { type: "text", id: nameId, placeholder: "e.g. Chaitanya Dark" });
+    const nameInput = el("input", { type: "text", id: nameId, placeholder: "e.g. My dark theme" });
     const saveTplMsg = el("p", { class: "save-msg", role: "status", "aria-live": "polite" });
 
     panel.appendChild(el("div", { class: "var-group" },
-      el("h3", { text: "Save as a template" }),
-      el("p", { text: "Freezes the current look — colours, fonts, shape and type — as a reusable template stored in data.json." }),
+      el("h3", { text: "Save as a custom theme" }),
+      el("p", { text: "Freezes the current colours, fonts, shape and type as a reusable theme stored in data.json." }),
       el("div", { class: "var-row" },
-        el("label", { for: nameId, text: "Template name" }),
+        el("label", { for: nameId, text: "Theme name" }),
         el("span", { class: "var-ctl" }, nameInput,
           el("button", { class: "btn btn-ghost btn-sm", type: "button", onclick: function () {
             const name = nameInput.value.trim();
             if (!name) { saveTplMsg.textContent = "Give the template a name first."; saveTplMsg.className = "save-msg err"; return; }
             const r = resolvedTheme();
             const taken = {};
-            data.theme.templates.concat(TH.THEMES).forEach(function (t) { taken[t.id] = true; });
+            data.theme.customThemes.concat(TH.THEMES).forEach(function (t) { taken[t.id] = true; });
             let id = "custom-" + F.slug(name), n = 2;
             while (taken[id]) { id = "custom-" + F.slug(name) + "-" + n; n++; }
-            data.theme.templates.push({
-              id: id, name: name, blurb: "Your saved template.",
+            data.theme.customThemes.push({
+              id: id, name: name, blurb: "Your saved theme.",
               fonts: { display: r.fonts.display, body: r.fonts.body, mono: r.fonts.mono },
               vars: { common: Object.assign({}, r.vars.common), dark: Object.assign({}, r.vars.dark), light: Object.assign({}, r.vars.light) }
             });
@@ -1231,23 +1343,25 @@
             data.theme.vars = { common: {}, dark: {}, light: {} };
             data.theme.fonts = {};
             touched();
+            if (applyThemeHere) applyThemeToEditor();
             buildThemePanel(panel);
-          } }, "Save template"))),
+          } }, "Save theme"))),
       saveTplMsg,
-      data.theme.templates.length
-        ? el("div", null, el("p", { class: "sub-label", style: "margin:.8rem 0 .4rem", text: "Your templates" }),
-            data.theme.templates.map(function (t, i) {
+      data.theme.customThemes.length
+        ? el("div", null, el("p", { class: "sub-label", style: "margin:.8rem 0 .4rem", text: "Your themes" }),
+            data.theme.customThemes.map(function (t, i) {
               return el("div", { class: "order-row" },
                 el("span", { class: "order-name", text: t.name }),
                 el("span", { class: "order-kind", text: t.id }),
-                toolBtn("✕", "Delete template " + t.name, false, function () {
-                  if (!window.confirm("Delete the template “" + t.name + "”?")) return;
-                  data.theme.templates.splice(i, 1);
-                  if (data.theme.preset === t.id) data.theme.preset = "graphite";
-                  touched(); buildThemePanel(panel);
+                toolBtn("✕", "Delete theme " + t.name, false, function () {
+                  if (!window.confirm("Delete the theme “" + t.name + "”?")) return;
+                  data.theme.customThemes.splice(i, 1);
+                  if (data.theme.preset === t.id) data.theme.preset = "minimal-light";
+                  touched(); if (applyThemeHere) applyThemeToEditor(); buildThemePanel(panel);
                 }, "danger"));
             }))
         : null));
+    fitThemeThumbnails(panel);
     ICONS.paint();
   }
 
@@ -1265,9 +1379,8 @@
 
     /* templates */
     panel.appendChild(el("p", { class: "sub-head", text: "Layout" }));
-    const grid = el("div", { class: "pdf-grid" });
-    RES.TEMPLATES.forEach(function (t) {
-      grid.appendChild(el("button", {
+    const resumeCard = function (t) {
+      return el("button", {
         type: "button", class: "pdf-card", "aria-pressed": String(data.pdf.template === t.id),
         onclick: function () {
           data.pdf.template = t.id; touched(); buildResumePanel(panel);
@@ -1276,9 +1389,20 @@
       },
         el("strong", { text: t.name }),
         el("span", { text: t.blurb }),
-        t.sketch ? el("pre", { class: "pdf-sketch", text: t.sketch.join("\n") }) : null));
-    });
-    panel.appendChild(grid);
+        t.sketch ? el("pre", { class: "pdf-sketch", text: t.sketch.join("\n") }) : null);
+    };
+    panel.appendChild(el("div", { class: "pdf-grid resume-templates" }, RES.TEMPLATES.filter(function (t) { return t.featured; }).map(resumeCard)));
+    const otherLayouts = RES.TEMPLATES.filter(function (t) { return !t.featured; });
+    panel.appendChild(el("details", { class: "more-options", open: otherLayouts.some(function (t) { return t.id === data.pdf.template; }) },
+      el("summary", { text: "More layouts (" + otherLayouts.length + ")" }), el("div", { class: "pdf-grid" }, otherLayouts.map(resumeCard))));
+
+    panel.appendChild(el("h3", { class: "sub-head", text: "Length" }));
+    panel.appendChild(el("div", { class: "mode-switch", role: "group", "aria-label": "Resume length" },
+      [["auto", "Fit content"], ["1", "One page"], ["2", "Two pages"]].map(function (choice) {
+        return el("button", { type: "button", "aria-pressed": String(data.pdf.pages === choice[0]), text: choice[1],
+          onclick: function () { data.pdf.pages = choice[0]; touched(); buildResumePanel(panel); } });
+      })));
+    panel.appendChild(el("p", { class: "hint", text: "One page tightens spacing and keeps the strongest bullets of older roles. Fit content lets your history decide." }));
 
     /* paper + exclusions */
     const paperId = uid();
@@ -1306,6 +1430,12 @@
       return el("div", { class: "field-inline" }, box, el("label", { for: id, text: s.label }));
     }) : el("p", { class: "empty", text: "No sections with content yet." })));
 
+    const visualId = uid(), visual = el("input", { type: "checkbox", id: visualId });
+    visual.checked = data.pdf.includeVisual;
+    visual.addEventListener("change", function () { data.pdf.includeVisual = visual.checked; touched(); });
+    panel.appendChild(el("div", { class: "field-inline" }, visual,
+      el("label", { for: visualId, text: "Include portfolio-only sections (galleries, quotes, stat bands)" })));
+
     /* exports */
     panel.appendChild(el("p", { class: "sub-head", text: "Download" }));
     const exportGrid = el("div", { class: "export-grid" });
@@ -1327,7 +1457,7 @@
 
   function runExport(spec, msg) {
     const setMsgText = function (t, kind) { msg.textContent = t; msg.className = "save-msg" + (kind ? " " + kind : ""); };
-    const opts = { template: data.pdf.template, paper: data.pdf.paper };
+    const opts = { template: data.pdf.template, paper: data.pdf.paper, pages: data.pdf.pages, includeVisual: data.pdf.includeVisual, exclude: data.pdf.exclude };
     const base = RES.fileBase(data);
 
     if (spec.kind === "print") {
@@ -1338,7 +1468,8 @@
         setMsgText("Opening the preview first — press PDF again once it has loaded.", "warn");
         return;
       }
-      frame.contentWindow.postMessage({ type: "portfolio:print", template: opts.template, paper: opts.paper }, "*");
+      sendPreview();
+      frame.contentWindow.postMessage({ type: "portfolio:print", template: opts.template, paper: opts.paper }, window.location.origin);
       setMsgText("Print dialog opening — choose “Save as PDF” as the destination.", "ok");
       return;
     }
@@ -1360,7 +1491,7 @@
   /* ====================================================================
      VALIDATION
      ==================================================================== */
-  const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
+  const MONTH_RE = /^\d{4}(?:-(0[1-9]|1[0-2]))?$/;
   const YEAR_RE = /^\d{4}$/;
   const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -1405,13 +1536,13 @@
             else seen[s] = i + 1;
           }
           if (f.type === "month" && s && !MONTH_RE.test(s))
-            add(group.key, where + " › " + f.label, '"' + s + '" must be YYYY-MM (e.g. 2026-05).');
+            add(group.key, where + " › " + f.label, '"' + s + '" must be a year (2022) or year and month (2022-05).');
           if (f.type === "year" && s && !YEAR_RE.test(s))
             add(group.key, where + " › " + f.label, '"' + s + '" must be a 4-digit year.');
         });
         if (group.key === "experience" && item.startDate && item.endDate &&
             MONTH_RE.test(String(item.startDate)) && MONTH_RE.test(String(item.endDate)) &&
-            String(item.endDate) < String(item.startDate)) {
+            String(item.endDate).padEnd(7, "-12") < String(item.startDate).padEnd(7, "-01")) {
           add(group.key, where, "ends before it starts.");
         }
       });
@@ -1441,9 +1572,9 @@
       });
     });
 
-    const knownThemes = data.theme.templates.concat(TH.THEMES).map(function (t) { return t.id; });
-    if (knownThemes.indexOf(data.theme.preset) === -1)
-      add("theme", "Theme › Template", '"' + data.theme.preset + '" no longer exists — the site falls back to Graphite.', "warning");
+    const knownThemes = data.theme.customThemes.concat(TH.THEMES).map(function (t) { return t.id; });
+    if (knownThemes.indexOf(data.theme.preset) === -1 && !(TH.ALIASES && TH.ALIASES[data.theme.preset]))
+      add("theme", "Design › Theme", '"' + data.theme.preset + '" no longer exists — the site uses the default theme.', "warning");
     if (ICONS.ANIMATIONS.map(function (a) { return a.id; }).indexOf(data.theme.iconAnimation) === -1)
       add("theme", "Theme › Logo animation", '"' + data.theme.iconAnimation + '" is not a known animation.', "warning");
     if (RES.TEMPLATES.map(function (t) { return t.id; }).indexOf(data.pdf.template) === -1)
@@ -1522,6 +1653,15 @@
   }
 
   function buildPanel(group, panel) {
+    if (group.kind === "links") {
+      clear(panel);
+      panel.appendChild(el("div", { class: "panel-head" }, el("h2", { text: "Links" })));
+      panel.appendChild(el("p", { class: "section-doc", text: "Your professional profiles, code, writing and other links. These appear on your portfolio and resume." }));
+      panel.appendChild(listEditor(function () { return data.profile.links || (data.profile.links = []); }, {
+        fields: LINK_FIELDS, itemLabel: "link", title: function (it) { return it.label || it.url || "New link"; }
+      }));
+      return;
+    }
     if (group.kind === "sections") return buildSectionsPanel(panel);
     if (group.kind === "theme") return buildThemePanel(panel);
     if (group.kind === "resume") return buildResumePanel(panel);
@@ -1535,7 +1675,7 @@
         el("div", { class: "item-body" }, fieldGroups(data[group.key], group.fields, null))));
     } else {
       panel.appendChild(listEditor(function () { return data[group.key]; }, {
-        fields: group.fields, itemLabel: group.itemLabel, title: group.title, idPrefix: group.idPrefix
+        fields: group.fields, itemLabel: group.itemLabel, title: group.title, summary: group.summary, idPrefix: group.idPrefix
       }));
     }
     ICONS.paint();
@@ -1558,7 +1698,7 @@
     const modeSwitch = el("div", { class: "mode-switch", role: "group", "aria-label": "Preview colour mode" },
       [["dark", "Dark"], ["light", "Light"]].map(function (m) {
         return el("button", {
-          type: "button", "aria-pressed": String(data.theme.mode === m[0]), text: m[1],
+          type: "button", "aria-pressed": String(editMode === m[0]), text: m[1],
           onclick: function () { data.theme.mode = m[0]; editMode = m[0]; touched(); buildPreviewPanel(panel); sendPreview(); }
         });
       }));
@@ -1570,7 +1710,7 @@
 
     panel.appendChild(el("iframe", {
       class: "preview-frame", id: "preview-frame",
-      title: "Live preview of the portfolio", src: "index.html?preview=1"
+      title: "Live preview of the portfolio", src: "site.html?preview=1"
     }));
     previewReady = false;
   }
@@ -1587,6 +1727,7 @@
       panel.hidden = !on;
     });
     if (key === "preview") sendPreview();
+    if (key === "theme") sendThemePreview();
   }
 
   function refreshCounts() {
@@ -1601,12 +1742,61 @@
      PREVIEW BRIDGE
      ==================================================================== */
   window.addEventListener("message", function (e) {
+    const cardFrame = Array.prototype.find.call(document.querySelectorAll("iframe[data-theme-preview], iframe[data-look-preview]"), function (f) {
+      return e.source === f.contentWindow;
+    });
+    if (cardFrame && e.data && e.data.type === "portfolio:preview-ready") {
+      sendThemeCardPreview(cardFrame);
+      return;
+    }
+    const themeFrame = document.getElementById("theme-live-frame");
+    if (themeFrame && e.source === themeFrame.contentWindow && e.data && e.data.type === "portfolio:preview-ready") {
+      themePreviewReady = true;
+      sendThemePreview();
+      return;
+    }
     const frame = document.getElementById("preview-frame");
     if (!frame || e.source !== frame.contentWindow) return;
     if (!e.data || e.data.type !== "portfolio:preview-ready") return;
     previewReady = true;
     sendPreview();
   });
+
+  function sendThemeCardPreview(frame) {
+    if (!frame || !frame.contentWindow) return;
+    const previewData = JSON.parse(serialise());
+    const themeId = frame.getAttribute("data-theme-preview"), lookId = frame.getAttribute("data-look-preview");
+    if (lookId) PF.looks.applyTemplate(previewData, lookId);
+    if (themeId) previewData.theme = Object.assign({}, previewData.theme, {
+      preset: themeId, fonts: {}, vars: { common: {}, dark: {}, light: {} }
+    });
+    frame.contentWindow.postMessage({
+      type: "portfolio:data",
+      data: previewData,
+      mode: editMode,
+      view: "site",
+      template: data.pdf.template,
+      paper: data.pdf.paper
+    }, "*");
+    const host = frame.parentElement;
+    if (host) host.classList.add("is-ready");
+  }
+
+  function sendThemePreview() {
+    const frame = document.getElementById("theme-live-frame");
+    const hint = document.getElementById("theme-preview-hint");
+    if (!frame || !frame.contentWindow) return;
+    if (!themePreviewReady) { if (hint) hint.textContent = "Loading the real site preview…"; return; }
+    frame.contentWindow.postMessage({
+      type: "portfolio:data",
+      data: JSON.parse(serialise()),
+      mode: editMode,
+      view: "site",
+      template: data.pdf.template,
+      paper: data.pdf.paper
+    }, "*");
+    if (hint) hint.textContent = "Live " + editMode + " preview using your content and selected site layout.";
+  }
 
   function sendPreview() {
     const frame = document.getElementById("preview-frame");
@@ -1616,7 +1806,7 @@
     frame.contentWindow.postMessage({
       type: "portfolio:data",
       data: JSON.parse(serialise()),
-      mode: data.theme.mode,
+      mode: editMode,
       view: previewView,
       template: data.pdf.template,
       paper: data.pdf.paper
@@ -1632,7 +1822,7 @@
     const frame = document.getElementById("preview-frame");
     if (!frame) return;
     previewReady = false;
-    frame.src = "index.html?preview=1";
+    frame.src = "site.html?preview=1";
   }
 
   /* ====================================================================
@@ -1642,6 +1832,7 @@
     updateDirty();
     repaintHints();
     if (activeTab === "preview") sendPreview();
+    if (activeTab === "theme") sendThemePreview();
   }
 
   function updateDirty() {
@@ -1693,7 +1884,7 @@
       tokenInput.value = "";               // the token lives in TOKEN only
       data = res.data;
       sha = res.sha;
-      editMode = data.theme.mode;
+      editMode = "dark";
       document.getElementById("repo-label").textContent =
         repo.owner + "/" + repo.name + " @ " + repo.branch + " · " + repo.path;
       document.getElementById("sha-label").textContent = "sha " + String(sha).slice(0, 7);
@@ -1728,7 +1919,7 @@
     setMsg(saveMsg, "Reloading…");
     fetchFile().then(function (res) {
       data = res.data; sha = res.sha;
-      editMode = data.theme.mode;
+      editMode = "dark";
       document.getElementById("sha-label").textContent = "sha " + String(sha).slice(0, 7);
       buildTabs(); selectTab(activeTab === "preview" ? "profile" : activeTab);
       savedSnapshot = serialise();
@@ -1813,9 +2004,11 @@
   const ghMatch = host.match(/^([^.]+)\.github\.io$/);
   if (ghMatch) {
     document.getElementById("in-owner").value = ghMatch[1];
-    document.getElementById("in-repo").value = host;
+    const projectRepo = window.location.pathname.split("/").filter(Boolean)[0];
+    document.getElementById("in-repo").value = projectRepo || host;
   }
 
-  ICONS.install();
+  /* Do not install the optional CDN icon helper here. This page handles a
+     repository token, so every executable dependency must stay same-origin. */
   savedSnapshot = serialise();
 })();
