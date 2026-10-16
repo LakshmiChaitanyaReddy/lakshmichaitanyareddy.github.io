@@ -66,7 +66,19 @@
       sketch: ["███████████  name", "2026 │ role", "     │  • bullet", "2022 │ role", "     │  • bullet"] },
     { id: "minimal", name: "Minimal", railFirst: false,
       blurb: "No rules, no colour, no tag lists. Text and whitespace only.",
-      sketch: ["name", "title · contact", "", "EXPERIENCE", "role, company  date", "  bullet"] }
+      sketch: ["name", "title · contact", "", "EXPERIENCE", "role, company  date", "  bullet"] },
+    { id: "banded", name: "Banded", railFirst: false,
+      blurb: "Name in a tinted panel and section titles on their own bars. The most designed of the single-column layouts, still plain text underneath.",
+      sketch: ["╔════════════════╗", "║ name           ║", "║ title · contact║", "╚════════════════╝", "▐ EXPERIENCE", "role         date", "  • bullet"] },
+    { id: "ledger", name: "Ledger", railFirst: false,
+      blurb: "Ruled rows and figures aligned down the right. Conservative and easy to scan — built for accounting, audit, legal and finance.",
+      sketch: ["NAME", "title · contact", "──────────────────", "EXPERIENCE", "Role            date", "Company", "  • bullet", "──────────────────"] },
+    { id: "railtint", name: "Tinted rail", railFirst: true,
+      blurb: "Two columns with the left rail filled in. Skills, certifications and education sit together in a panel beside your history.",
+      sketch: ["████████  name", "┌────┬───────────┐", "│▒▒▒▒│EXPERIENCE │", "│▒sk▒│role  date │", "│▒ed▒│  • bullet │", "└────┴───────────┘"] },
+    { id: "narrative", name: "Narrative", railFirst: false,
+      blurb: "Roomy leading, dashes instead of dots, no tag lists. Reads as prose — suits teaching, care, research and clinical roles.",
+      sketch: ["      Name", "   title · contact", "", "  E X P E R I E N C E", "Role, Company   date", "  – what you did", "", "  E D U C A T I O N"] }
   ];
 
   const T_INDEX = {};
@@ -97,7 +109,7 @@
 
 "/* header */",
 ".r-head { margin-bottom: 5mm; }",
-".r-head::after { content: ''; display: table; clear: both; }",
+".r-head::after { content: ''; display: table; clear: right; }",   /* the photo, and only it */
 ".r-photo { float: right; width: 19mm; height: 19mm; object-fit: cover; border-radius: 50%; margin: 0 0 2mm 4mm; }",
 ".r-name { font-size: 21pt; line-height: 1.08; margin-bottom: 1mm; }",
 ".r-title { font-size: 11pt; font-weight: 600; color: var(--r-accent); margin-bottom: 2mm; }",
@@ -126,7 +138,13 @@
 ".r-entry { margin-bottom: 3.6mm; }",
 ".r-entry:last-child { margin-bottom: 0; }",
 ".r-entry-head { break-inside: avoid; page-break-inside: avoid; break-after: avoid; page-break-after: avoid; }",
-".r-entry-head::after { content: ''; display: table; clear: both; }",
+"/* clear: RIGHT, not both. The only float inside an entry head is its own",
+"   date, which sits right. `clear: both` also cleared the sidebar layout's",
+"   left-floating rail, so the first job's bullets were pushed below the",
+"   whole rail — a 40mm hole between a role and its own description, and the",
+"   worst of the blank space these PDFs were showing. */",
+".r-entry-head::after { content: ''; display: table; clear: right; }",
+".r-timeline .r-entry-head::after { clear: left; }",     /* there the date floats left */
 ".r-when { float: right; font-size: 8.4pt; color: var(--r-dim); font-variant-numeric: tabular-nums; margin-left: 4mm; }",
 ".r-role { font-size: 10.2pt; }",
 ".r-org { font-size: 9pt; color: var(--r-accent); font-weight: 600; margin-top: .4mm; }",
@@ -217,6 +235,40 @@
 ".r-technical .r-tags { font-size: 7.8pt; color: var(--r-ink); margin-top: 1.2mm; }",
 ".r-technical .r-rail .r-kv { font-family: var(--font-mono, ui-monospace, monospace); font-size: 8.8pt; }",
 ".r-technical .r-bullets li::before { content: '-'; color: var(--r-accent); }",
+
+"/* banded — the name in a panel and each section title on a bar. The tints",
+"   are kept inside the page margin: a background bled to the paper edge",
+"   needs `-webkit-print-color-adjust` and a printer that honours it. */",
+".r-banded .r-head { background: #f3f6f5; padding: 4mm 5mm; margin-bottom: 5mm; }",
+".r-banded .r-sec > h2 { background: #f3f6f5; padding: 1.4mm 2.5mm; border-bottom: 0; border-left: 1.6pt solid var(--r-accent); margin-bottom: 2.2mm; }",
+".r-banded .r-entry { padding-left: 2.5mm; }",
+
+"/* ledger — ruled rows, figures down the right. Conservative on purpose. */",
+".r-ledger { font-size: 10pt; }",
+".r-ledger .r-head { border-bottom: 1.2pt solid var(--r-ink); padding-bottom: 3mm; }",
+".r-ledger .r-sec > h2 { border-bottom-width: 1pt; border-bottom-color: var(--r-ink); }",
+".r-ledger .r-entry { border-bottom: .4pt solid var(--r-line); padding-bottom: 2.6mm; margin-bottom: 2.6mm; }",
+".r-ledger .r-entry:last-child { border-bottom: 0; padding-bottom: 0; }",
+".r-ledger .r-when { font-variant-numeric: tabular-nums; color: var(--r-ink); }",
+".r-ledger .r-org { color: var(--r-ink); }",
+".r-ledger .r-bullets li::before { content: '\\2022'; color: var(--r-dim); }",
+".r-ledger .r-tags { display: none; }",
+
+"/* tinted rail — the sidebar float with the rail filled in. Same float, so",
+"   it fragments the same way; the tint simply stops with the rail. */",
+".r-railtint .r-rail { float: left; width: 33%; padding: 3.5mm 4.5mm; background: #f3f6f5; }",
+".r-railtint .r-main { margin-left: 37%; }",
+".r-railtint .r-rail .r-sec > h2 { border-bottom-color: var(--r-accent); }",
+".r-railtint .r-rail > .r-sec:first-child { margin-top: 0; }",
+
+"/* narrative — prose, not a spec sheet */",
+".r-narrative { font-family: var(--font-display, Georgia, serif); font-size: 10.5pt; line-height: 1.6; }",
+".r-narrative .r-head { text-align: center; }",
+".r-narrative .r-summary { text-align: left; }",
+".r-narrative .r-sec > h2 { text-align: center; border-bottom: 0; letter-spacing: .2em; font-size: 8.6pt; }",
+".r-narrative .r-bullets li::before { content: '\\2013'; color: var(--r-dim); }",
+".r-narrative .r-bullets li { margin-bottom: 1.4mm; }",
+".r-narrative .r-tags { display: none; }",
 
 "/* page modes — one page tightens everything; two pages breathes */",
 ".r-pages-1 { font-size: 9pt; line-height: 1.32; }",
