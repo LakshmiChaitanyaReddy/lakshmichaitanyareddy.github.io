@@ -14,8 +14,8 @@
       "light": {}
     },
     "fonts": {},
-    "preset": "signal-grid",
-    "variation": "standard",
+    "preset": "bold-gradient",
+    "variation": "open",
     "customThemes": [],
     "iconAnimation": "lift"
   },
