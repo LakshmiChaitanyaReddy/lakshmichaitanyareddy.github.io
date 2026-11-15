@@ -1,6 +1,6 @@
 {
   "pdf": {
-    "pages": "auto",
+    "pages": "1",
     "paper": "a4",
     "exclude": [],
     "template": "modern",
@@ -14,7 +14,7 @@
       "light": {}
     },
     "fonts": {},
-    "preset": "bold-gradient",
+    "preset": "apple-glass",
     "variation": "open",
     "customThemes": [],
     "iconAnimation": "lift"
@@ -164,9 +164,9 @@
   ],
   "sections": [],
   "template": {
-    "skeleton": "cloud-operations",
+    "skeleton": "clean-recruiter",
     "pack": "software-it",
-    "look": "cloud-operations"
+    "look": "clean-recruiter"
   },
   "education": [
     {
@@ -227,20 +227,20 @@
     }
   ],
   "sectionOrder": [
-    "projects",
-    "skills",
-    "experience",
     "about",
-    "certifications",
-    "education"
+    "experience",
+    "skills",
+    "projects",
+    "education",
+    "certifications"
   ],
   "sectionLabels": {
-    "about": "Approach",
-    "skills": "Service map",
-    "projects": "Deployments",
+    "about": "Summary",
+    "skills": "Skills",
+    "projects": "Projects",
     "education": "Education",
-    "experience": "Operating history",
-    "certifications": "Credentials"
+    "experience": "Experience",
+    "certifications": "Certifications"
   },
   "certifications": [
     {
